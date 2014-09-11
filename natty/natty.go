@@ -9,6 +9,7 @@ import (
 	"io/ioutil"
 	"os/exec"
 	"strings"
+	"sync"
 
 	"github.com/oxtoacart/byteexec"
 )
@@ -28,9 +29,9 @@ type FiveTuple struct {
 
 // Natty is a NAT traversal utility.
 type Natty struct {
-	// OnMessage (required) is called whenever Natty has a message to send to
-	// another Natty.  Messages includes things such as SDP and ICE candidates.
-	OnMessage func(msg string)
+	// Send (required) is called whenever Natty has a message to send to the
+	// other Natty.  Messages includes things such as SDP and ICE candidates.
+	Send func(msg string)
 	// DebugOut (optional) is an optional Writer to which debug output from
 	// Natty will be written.
 	DebugOut  io.Writer
@@ -44,19 +45,23 @@ type Natty struct {
 }
 
 // Offer runs this Natty as an Offerer, meaning that it will make an offer to
-// initiate an ICE session.
+// initiate an ICE session. Once NAT traversal is successful, this function
+// returns the resulting FiveTuple. If NAT traversal fails, this function will
+// block indefinitely (TODO: add timeout).
 func (natty *Natty) Offer() (*FiveTuple, error) {
 	return natty.run([]string{"-offer"})
 }
 
 // Answer runs this Natty as an Answerer, meaning that it will accept offers to
-// initiate an ICE session.
+// initiate an ICE session. Once NAT traversal is successful, this function
+// returns the resulting FiveTuple. If NAT traversal fails, this function will
+// block indefinitely (TODO: add timeout).
 func (natty *Natty) Answer() (*FiveTuple, error) {
 	return natty.run([]string{})
 }
 
-// Message is used to pass this Natty a message from the other Natty.
-func (natty *Natty) Message(msg string) error {
+// Receive is used to pass this Natty a message from the other Natty.
+func (natty *Natty) Receive(msg string) error {
 	_, err := natty.stdin.Write([]byte(msg))
 	if err == nil {
 		_, err = natty.stdin.Write([]byte("\n"))
@@ -83,12 +88,19 @@ func (natty *Natty) run(params []string) (*FiveTuple, error) {
 	}
 
 	natty.resultCh = make(chan *FiveTuple)
-	natty.errCh = make(chan error)
+	natty.errCh = make(chan error, 10)
 	go natty.processStdout()
 	go natty.processStderr()
+
+	var wg sync.WaitGroup
+	wg.Add(1)
 	go func() {
 		natty.errCh <- natty.cmd.Run()
+		wg.Done()
 	}()
+
+	// Wait for process to finish running before returning from this function
+	defer wg.Wait()
 
 	for {
 		select {
@@ -157,7 +169,7 @@ func (natty *Natty) processStdout() {
 			}
 			natty.resultCh <- fiveTuple
 		} else {
-			natty.OnMessage(msg)
+			natty.Send(msg)
 		}
 	}
 }
