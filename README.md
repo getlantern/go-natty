@@ -7,7 +7,7 @@ To install:
 
 For docs:
 
-[`godoc github.com/getlantern/go-natty/natty`](godoc github.com/getlantern/go-natty/natty)
+[`godoc github.com/getlantern/go-natty/natty`](https://godoc.org/github.com/getlantern/go-natty/natty)
 
 Acknowledgements:
 
