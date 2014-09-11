@@ -1,3 +1,5 @@
+// Package natty provides a Go language wrapper to the natty NAT traversal
+// utility.  See https://github.com/getlantern/natty.
 package natty
 
 import (
@@ -24,9 +26,14 @@ type FiveTuple struct {
 	Remote string
 }
 
+// Natty is a NAT traversal utility.
 type Natty struct {
+	// OnMessage (required) is called whenever Natty has a message to send to
+	// another Natty.  Messages includes things such as SDP and ICE candidates.
 	OnMessage func(msg string)
-	ErrOut    io.Writer
+	// DebugOut (optional) is an optional Writer to which debug output from
+	// Natty will be written.
+	DebugOut  io.Writer
 	cmd       *exec.Cmd
 	stdin     io.WriteCloser
 	stdout    io.ReadCloser
@@ -36,12 +43,25 @@ type Natty struct {
 	errCh     chan error
 }
 
+// Offer runs this Natty as an Offerer, meaning that it will make an offer to
+// initiate an ICE session.
 func (natty *Natty) Offer() (*FiveTuple, error) {
 	return natty.run([]string{"-offer"})
 }
 
+// Answer runs this Natty as an Answerer, meaning that it will accept offers to
+// initiate an ICE session.
 func (natty *Natty) Answer() (*FiveTuple, error) {
 	return natty.run([]string{})
+}
+
+// Message is used to pass this Natty a message from the other Natty.
+func (natty *Natty) Message(msg string) error {
+	_, err := natty.stdin.Write([]byte(msg))
+	if err == nil {
+		_, err = natty.stdin.Write([]byte("\n"))
+	}
+	return err
 }
 
 func (natty *Natty) run(params []string) (*FiveTuple, error) {
@@ -85,9 +105,9 @@ func (natty *Natty) run(params []string) (*FiveTuple, error) {
 }
 
 func (natty *Natty) initCommand(params []string) error {
-	if natty.ErrOut == nil {
+	if natty.DebugOut == nil {
 		// Discard stderr output by default
-		natty.ErrOut = ioutil.Discard
+		natty.DebugOut = ioutil.Discard
 	} else {
 		params = append(params, "-debug")
 	}
@@ -121,7 +141,6 @@ func (natty *Natty) initCommand(params []string) error {
 }
 
 func (natty *Natty) processStdout() {
-	// Handle stdout
 	for {
 		msg, err := natty.stdoutbuf.ReadString('\n')
 		if err != nil {
@@ -144,15 +163,6 @@ func (natty *Natty) processStdout() {
 }
 
 func (natty *Natty) processStderr() {
-	// Handle stderr
-	_, err := io.Copy(natty.ErrOut, natty.stderr)
+	_, err := io.Copy(natty.DebugOut, natty.stderr)
 	natty.errCh <- err
-}
-
-func (natty *Natty) Message(msg string) error {
-	_, err := natty.stdin.Write([]byte(msg))
-	if err == nil {
-		_, err = natty.stdin.Write([]byte("\n"))
-	}
-	return err
 }
