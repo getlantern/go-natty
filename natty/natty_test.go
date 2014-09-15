@@ -21,7 +21,7 @@ func TestLocal(t *testing.T) {
 	var answerer *Natty
 
 	offerer = &Natty{
-		Send: func(msg string) {
+		Send: func(msg []byte) {
 			// This would be done using a signaling server when talking to a
 			// remote Natty
 			answerer.Receive(msg)
@@ -29,7 +29,7 @@ func TestLocal(t *testing.T) {
 	}
 
 	answerer = &Natty{
-		Send: func(msg string) {
+		Send: func(msg []byte) {
 			// This would be done using a signaling server when talking to a
 			// remote Natty
 			offerer.Receive(msg)

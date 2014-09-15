@@ -31,7 +31,7 @@ type FiveTuple struct {
 type Natty struct {
 	// Send (required) is called whenever Natty has a message to send to the
 	// other Natty.  Messages includes things such as SDP and ICE candidates.
-	Send func(msg string)
+	Send func(msg []byte)
 	// DebugOut (optional) is an optional Writer to which debug output from
 	// Natty will be written.
 	DebugOut  io.Writer
@@ -61,8 +61,8 @@ func (natty *Natty) Answer() (*FiveTuple, error) {
 }
 
 // Receive is used to pass this Natty a message from the other Natty.
-func (natty *Natty) Receive(msg string) error {
-	_, err := natty.stdin.Write([]byte(msg))
+func (natty *Natty) Receive(msg []byte) error {
+	_, err := natty.stdin.Write(msg)
 	if err == nil {
 		_, err = natty.stdin.Write([]byte("\n"))
 	}
@@ -169,7 +169,7 @@ func (natty *Natty) processStdout() {
 			}
 			natty.resultCh <- fiveTuple
 		} else {
-			natty.Send(msg)
+			natty.Send([]byte(msg))
 		}
 	}
 }
