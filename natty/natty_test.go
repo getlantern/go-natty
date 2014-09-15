@@ -20,21 +20,21 @@ func TestLocal(t *testing.T) {
 	var offerer *Natty
 	var answerer *Natty
 
-	offerer = &Natty{
-		Send: func(msg []byte) {
+	offerer = NewNatty(
+		func(msg []byte) {
 			// This would be done using a signaling server when talking to a
 			// remote Natty
 			answerer.Receive(msg)
 		},
-	}
+		nil)
 
-	answerer = &Natty{
-		Send: func(msg []byte) {
+	answerer = NewNatty(
+		func(msg []byte) {
 			// This would be done using a signaling server when talking to a
 			// remote Natty
 			offerer.Receive(msg)
 		},
-	}
+		nil)
 
 	var wg sync.WaitGroup
 	wg.Add(2)

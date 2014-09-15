@@ -29,19 +29,34 @@ type FiveTuple struct {
 
 // Natty is a NAT traversal utility.
 type Natty struct {
-	// Send (required) is called whenever Natty has a message to send to the
-	// other Natty.  Messages includes things such as SDP and ICE candidates.
-	Send func(msg []byte)
-	// DebugOut (optional) is an optional Writer to which debug output from
-	// Natty will be written.
-	DebugOut  io.Writer
+	send      func(msg []byte)
+	debugOut  io.Writer
 	cmd       *exec.Cmd
 	stdin     io.WriteCloser
 	stdout    io.ReadCloser
 	stdoutbuf *bufio.Reader
 	stderr    io.ReadCloser
+	recvCh    chan []byte
+	recvErrCh chan error
 	resultCh  chan *FiveTuple
 	errCh     chan error
+}
+
+// NewNatty constructs a new Natty.
+// send (required) is called whenever Natty has a message to send to the other
+// Natty.  Messages includes things such as SDP and ICE candidates.
+// debugOut (optional) is an optional Writer to which debug output from Natty
+// will be written.
+func NewNatty(send func(msg []byte), debugOut io.Writer) *Natty {
+	natty := &Natty{
+		send:     send,
+		debugOut: debugOut,
+	}
+	natty.recvCh = make(chan []byte)
+	natty.recvErrCh = make(chan error)
+	natty.resultCh = make(chan *FiveTuple)
+	natty.errCh = make(chan error, 10)
+	return natty
 }
 
 // Offer runs this Natty as an Offerer, meaning that it will make an offer to
@@ -62,11 +77,8 @@ func (natty *Natty) Answer() (*FiveTuple, error) {
 
 // Receive is used to pass this Natty a message from the other Natty.
 func (natty *Natty) Receive(msg []byte) error {
-	_, err := natty.stdin.Write(msg)
-	if err == nil {
-		_, err = natty.stdin.Write([]byte("\n"))
-	}
-	return err
+	natty.recvCh <- msg
+	return <-natty.recvErrCh
 }
 
 func (natty *Natty) run(params []string) (*FiveTuple, error) {
@@ -87,8 +99,6 @@ func (natty *Natty) run(params []string) (*FiveTuple, error) {
 		return nil, err
 	}
 
-	natty.resultCh = make(chan *FiveTuple)
-	natty.errCh = make(chan error, 10)
 	go natty.processStdout()
 	go natty.processStderr()
 
@@ -97,6 +107,18 @@ func (natty *Natty) run(params []string) (*FiveTuple, error) {
 	go func() {
 		natty.errCh <- natty.cmd.Run()
 		wg.Done()
+	}()
+
+	// Process received messages
+	go func() {
+		for {
+			msg := <-natty.recvCh
+			_, err := natty.stdin.Write(msg)
+			if err == nil {
+				_, err = natty.stdin.Write([]byte("\n"))
+			}
+			natty.recvErrCh <- err
+		}
 	}()
 
 	// Wait for process to finish running before returning from this function
@@ -117,9 +139,9 @@ func (natty *Natty) run(params []string) (*FiveTuple, error) {
 }
 
 func (natty *Natty) initCommand(params []string) error {
-	if natty.DebugOut == nil {
+	if natty.debugOut == nil {
 		// Discard stderr output by default
-		natty.DebugOut = ioutil.Discard
+		natty.debugOut = ioutil.Discard
 	} else {
 		params = append(params, "-debug")
 	}
@@ -169,12 +191,12 @@ func (natty *Natty) processStdout() {
 			}
 			natty.resultCh <- fiveTuple
 		} else {
-			natty.Send([]byte(msg))
+			natty.send([]byte(msg))
 		}
 	}
 }
 
 func (natty *Natty) processStderr() {
-	_, err := io.Copy(natty.DebugOut, natty.stderr)
+	_, err := io.Copy(natty.debugOut, natty.stderr)
 	natty.errCh <- err
 }
