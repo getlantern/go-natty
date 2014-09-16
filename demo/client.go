@@ -2,9 +2,11 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"io/ioutil"
 	"log"
 	"math/rand"
+	"net"
 	"net/http"
 	"strconv"
 	"strings"
@@ -19,6 +21,8 @@ import (
 var (
 	server    = flag.String("server", "", "Server id (only used when running as a client)")
 	socksPort = flag.Int("socksport", 18000, "Port for SOCKS server, default 18000 (only used when running as a client)")
+
+	serverReady = make(chan bool, 10)
 )
 
 func runClient() {
@@ -34,20 +38,26 @@ func runClient() {
 		log.Fatalf("Unable to parse PeerID for server %s: %s", *server, err)
 	}
 
-	nt := natty.NewNatty(
-		func(msgOut []byte) {
-			wc.SendPieces(serverId, idToBytes(sessionId), msgOut)
+	nt := natty.Offer(
+		func(msgOut string) {
+			if *debug {
+				log.Printf("Sending %s", msgOut)
+			}
+			wc.SendPieces(serverId, idToBytes(sessionId), []byte(msgOut))
 		},
-		nil)
+		debugOut)
 
 	go receiveMessagesForNatty(nt, sessionId)
 
-	ft, err := nt.Offer()
+	ft, err := nt.FiveTuple()
 	if err != nil {
 		log.Fatalf("Unable to offer: %s", err)
 	}
 	log.Printf("Got five tuple: %s", ft)
-	runUDTClient(ft)
+	//runUDTClient(ft)
+	if <-serverReady {
+		writeUDP(ft)
+	}
 }
 
 func receiveMessagesForNatty(nt *natty.Natty, sessionId uint32) {
@@ -62,7 +72,36 @@ func receiveMessagesForNatty(nt *natty.Natty, sessionId uint32) {
 			log.Printf("Got message for unknown session id %d, skipping", msg.getSessionID())
 			continue
 		}
-		nt.Receive(msg.getData())
+		if *debug {
+			log.Printf("Received: %s", msg.getData())
+		}
+		msgString := string(msg.getData())
+		if READY == msgString {
+			// Server's ready!
+			serverReady <- true
+		} else {
+			nt.Receive(msgString)
+		}
+	}
+}
+
+func writeUDP(ft *natty.FiveTuple) {
+	local, remote, err := udpAddresses(ft)
+	if err != nil {
+		log.Fatalf("Unable to resolve UDP addresses: %s", err)
+	}
+	conn, err := net.DialUDP("udp", local, remote)
+	if err != nil {
+		log.Fatalf("Unable to dial UDP: %s", err)
+	}
+	for {
+		msg := fmt.Sprintf("Hello from %s", ft.Local)
+		log.Printf("Sending UDP message: %s", msg)
+		_, err := conn.Write([]byte(msg))
+		if err != nil {
+			log.Fatalf("Offerer unable to write to UDP: %s", err)
+		}
+		time.Sleep(1 * time.Second)
 	}
 }
 

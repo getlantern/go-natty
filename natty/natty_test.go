@@ -20,18 +20,20 @@ func TestLocal(t *testing.T) {
 	var offerer *Natty
 	var answerer *Natty
 
-	offerer = NewNatty(
-		func(msg []byte) {
+	offerer = Offer(
+		func(msg string) {
 			// This would be done using a signaling server when talking to a
 			// remote Natty
+			log.Printf("Offerer -> Answerer: %s", msg)
 			answerer.Receive(msg)
 		},
 		nil)
 
-	answerer = NewNatty(
-		func(msg []byte) {
+	answerer = Answer(
+		func(msg string) {
 			// This would be done using a signaling server when talking to a
 			// remote Natty
+			log.Printf("Answerer -> Offerer: %s", msg)
 			offerer.Receive(msg)
 		},
 		nil)
@@ -45,7 +47,7 @@ func TestLocal(t *testing.T) {
 	// Offerer processing
 	go func() {
 		defer wg.Done()
-		fiveTuple, err := offerer.Offer()
+		fiveTuple, err := offerer.FiveTuple()
 		if err != nil {
 			t.Errorf("Offerer had error: %s", err)
 			return
@@ -78,7 +80,7 @@ func TestLocal(t *testing.T) {
 	// Answerer processing
 	go func() {
 		defer wg.Done()
-		fiveTuple, err := answerer.Answer()
+		fiveTuple, err := answerer.FiveTuple()
 		if err != nil {
 			t.Errorf("Answerer had error: %s", err)
 			return

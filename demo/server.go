@@ -2,6 +2,7 @@ package main
 
 import (
 	"log"
+	"net"
 	"strconv"
 	"strings"
 	"sync"
@@ -23,7 +24,7 @@ var (
 )
 
 func runServer() {
-	log.Printf("Starting server, waddell id is %s ...", wc.ID().String())
+	log.Printf("Starting server, waddell id is \"%s\"", wc.ID().String())
 
 	peers = make(map[waddell.PeerId]*peer)
 
@@ -58,12 +59,18 @@ func (p *peer) answer(wm *waddell.Message) {
 	sessionId := msg.getSessionID()
 	nt := p.sessions[sessionId]
 	if nt == nil {
+		if *debug {
+			log.Printf("Creating new natty")
+		}
 		// Set up a new Natty session
-		nt = natty.NewNatty(
-			func(msgOut []byte) {
-				wc.SendPieces(p.id, idToBytes(sessionId), msgOut)
+		nt = natty.Answer(
+			func(msgOut string) {
+				if *debug {
+					log.Printf("Sending %s", msgOut)
+				}
+				wc.SendPieces(p.id, idToBytes(sessionId), []byte(msgOut))
 			},
-			nil)
+			debugOut)
 		go func() {
 			defer func() {
 				p.sessionsMutex.Lock()
@@ -71,17 +78,21 @@ func (p *peer) answer(wm *waddell.Message) {
 				delete(p.sessions, sessionId)
 			}()
 
-			ft, err := nt.Answer()
+			ft, err := nt.FiveTuple()
 			if err != nil {
 				log.Printf("Unable to answer session %d: %s", sessionId, err)
 			}
 
 			log.Printf("Got five tuple: %s", ft)
-			go runUDTServer(ft)
+			//go runUDTServer(ft)
+			readUDP(p.id, sessionId, ft)
 		}()
 		p.sessions[sessionId] = nt
 	}
-	nt.Receive(msg.getData())
+	if *debug {
+		log.Printf("Received: %s", msg.getData())
+	}
+	nt.Receive(string(msg.getData()))
 }
 
 func runUDTServer(ft *natty.FiveTuple) {
@@ -97,5 +108,28 @@ func runUDTServer(ft *natty.FiveTuple) {
 	err = udtServer.Run()
 	if err != nil {
 		log.Fatalf("Server error: %s", err)
+	}
+}
+
+func readUDP(peerId waddell.PeerId, sessionId uint32, ft *natty.FiveTuple) {
+	local, _, err := udpAddresses(ft)
+	if err != nil {
+		log.Fatalf("Unable to resolve UDP addresses: %s", err)
+	}
+	conn, err := net.ListenUDP("udp", local)
+	if err != nil {
+		log.Fatalf("Unable to listen on UDP: %s", err)
+	}
+	log.Printf("Listening for UDP packets at: %s", local)
+	// Let the client know that we're ready
+	wc.SendPieces(peerId, idToBytes(sessionId), []byte(READY))
+	b := make([]byte, 1024)
+	for {
+		n, addr, err := conn.ReadFrom(b)
+		if err != nil {
+			log.Fatalf("Unable to read from UDP: %s", err)
+		}
+		msg := string(b[:n])
+		log.Printf("Got UDP message from %s: '%s'", addr, msg)
 	}
 }
