@@ -20,8 +20,8 @@ client will connect to the server and obtain its IP address by making a request
 to [ifconfig.me](http://ifconfig.me/ip).
 
 The client and server signal with each other using
-[waddell](getlantern/waddell) and use [go-udtrelay](getlantern/go-udtrelay) for
-a reliable udp-based transport.  The client finds the server on waddell using
+[waddell](getlantern/waddell) and the client sends UDP packets to the server
+once NAT-traversal is complete. The client finds the server on waddell using
 its waddell id.
 
 ### Example Demo Session
@@ -29,9 +29,14 @@ its waddell id.
 #### Server
 
 ```bash
-Macintosh% ./natty-demo-osx -mode server        
-2014/09/16 16:21:06 Starting server, waddell id is "166bd5f6-700d-4337-8bfc-969cb4bd00e3"
-2014/09/16 16:22:01 Got five tuple: &{udp 192.168.1.160:52479 192.168.1.160:61790}
+Macintosh% ./natty-demo-osx -mode server                                                            
+2014/09/16 18:41:36 Starting server, waddell id is "e6679a41-0003-4f9b-8ae4-671a8a196d13"
+2014/09/16 18:41:49 Got five tuple: &{udp 192.168.1.160:55285 192.168.1.160:60530}
+2014/09/16 18:41:49 Listening for UDP packets at: 192.168.1.160:55285
+2014/09/16 18:41:49 Got UDP message from 192.168.1.160:60530: 'Hello from 192.168.1.160:60530'
+2014/09/16 18:41:50 Got UDP message from 192.168.1.160:60530: 'Hello from 192.168.1.160:60530'
+2014/09/16 18:41:51 Got UDP message from 192.168.1.160:60530: 'Hello from 192.168.1.160:60530'
+2014/09/16 18:41:52 Got UDP message from 192.168.1.160:60530: 'Hello from 192.168.1.160:60530'
 ```
 
 Note - you have to specify the waddell id emitted by the server when running the
@@ -40,11 +45,13 @@ client.
 #### Client
 
 ```bash
-Macintosh% ./natty-demo-osx -mode client -server "166bd5f6-700d-4337-8bfc-969cb4bd00e3"
-2014/09/16 16:21:58 Starting client, connecting to server 166bd5f6-700d-4337-8bfc-969cb4bd00e3 ...
-2014/09/16 16:22:01 Got five tuple: &{udp 192.168.1.160:61790 192.168.1.160:52479}
-2014/09/16 16:22:08 Proxy's IP is: 66.69.242.177
-Macintosh% 
+Macintosh% ./natty-demo-osx -mode client -server "e6679a41-0003-4f9b-8ae4-671a8a196d13"
+2014/09/16 18:41:46 Starting client, connecting to server e6679a41-0003-4f9b-8ae4-671a8a196d13 ...
+2014/09/16 18:41:48 Got five tuple: &{udp 192.168.1.160:60530 192.168.1.160:55285}
+2014/09/16 18:41:49 Sending UDP message: Hello from 192.168.1.160:60530
+2014/09/16 18:41:50 Sending UDP message: Hello from 192.168.1.160:60530
+2014/09/16 18:41:51 Sending UDP message: Hello from 192.168.1.160:60530
+2014/09/16 18:41:52 Sending UDP message: Hello from 192.168.1.160:60530
 ```
 
 Acknowledgements:
