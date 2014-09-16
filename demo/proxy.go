@@ -1,17 +1,13 @@
 package main
 
-// see http://blog.matee.net/post/tor-proxy-with-go
-
 import (
 	"encoding/binary"
 	"flag"
-	"fmt"
 	"io"
 	"log"
 	"net"
 	"os"
 
-	"github.com/getlantern/go-natty/natty"
 	"github.com/getlantern/waddell"
 )
 
@@ -84,19 +80,4 @@ func connectToWaddell() {
 	if err != nil {
 		log.Fatalf("Unable to connect to waddell: %s", err)
 	}
-}
-
-func udpAddresses(ft *natty.FiveTuple) (*net.UDPAddr, *net.UDPAddr, error) {
-	if ft.Proto != natty.UDP {
-		return nil, nil, fmt.Errorf("FiveTuple.Proto was not UDP!: %s", ft.Proto)
-	}
-	local, err := net.ResolveUDPAddr("udp", ft.Local)
-	if err != nil {
-		return nil, nil, fmt.Errorf("Unable to resolve local UDP address %s: %s", ft.Local)
-	}
-	remote, err := net.ResolveUDPAddr("udp", ft.Remote)
-	if err != nil {
-		return nil, nil, fmt.Errorf("Unable to resolve remote UDP address %s: %s", ft.Remote)
-	}
-	return local, remote, nil
 }

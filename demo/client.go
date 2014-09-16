@@ -2,11 +2,9 @@ package main
 
 import (
 	"flag"
-	"fmt"
 	"io/ioutil"
 	"log"
 	"math/rand"
-	"net"
 	"net/http"
 	"strconv"
 	"strings"
@@ -54,9 +52,8 @@ func runClient() {
 		log.Fatalf("Unable to offer: %s", err)
 	}
 	log.Printf("Got five tuple: %s", ft)
-	//runUDTClient(ft)
 	if <-serverReady {
-		writeUDP(ft)
+		runUDTClient(ft)
 	}
 }
 
@@ -85,26 +82,6 @@ func receiveMessagesForNatty(nt *natty.Natty, sessionId uint32) {
 	}
 }
 
-func writeUDP(ft *natty.FiveTuple) {
-	local, remote, err := udpAddresses(ft)
-	if err != nil {
-		log.Fatalf("Unable to resolve UDP addresses: %s", err)
-	}
-	conn, err := net.DialUDP("udp", local, remote)
-	if err != nil {
-		log.Fatalf("Unable to dial UDP: %s", err)
-	}
-	for {
-		msg := fmt.Sprintf("Hello from %s", ft.Local)
-		log.Printf("Sending UDP message: %s", msg)
-		_, err := conn.Write([]byte(msg))
-		if err != nil {
-			log.Fatalf("Offerer unable to write to UDP: %s", err)
-		}
-		time.Sleep(1 * time.Second)
-	}
-}
-
 func runUDTClient(ft *natty.FiveTuple) {
 	port, err := strconv.Atoi(strings.Split(ft.Local, ":")[1])
 	if err != nil {
@@ -128,13 +105,14 @@ func runUDTClient(ft *natty.FiveTuple) {
 	time.Sleep(1 * time.Second)
 
 	// Request our geolocation info
+	// see http://blog.matee.net/post/tor-proxy-with-go
 	clientPtr := prepareProxyClient(udtClient)
-	body, err := httpGetBody(clientPtr, "http://www.google.com/humans.txt")
+	body, err := httpGetBody(clientPtr, "http://ifconfig.me/ip")
 	if err != nil {
 		log.Fatalf("Error requesting geo info: %s", err)
 		return
 	}
-	log.Printf("%s", string(body))
+	log.Printf("Proxy's IP is: %s", string(body))
 }
 
 func prepareProxyClient(client *udtrelay.Client) *http.Client {

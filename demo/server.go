@@ -2,10 +2,10 @@ package main
 
 import (
 	"log"
-	"net"
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/getlantern/go-natty/natty"
 	"github.com/getlantern/go-udtrelay/udtrelay"
@@ -84,8 +84,7 @@ func (p *peer) answer(wm *waddell.Message) {
 			}
 
 			log.Printf("Got five tuple: %s", ft)
-			//go runUDTServer(ft)
-			readUDP(p.id, sessionId, ft)
+			go runUDTServer(p.id, sessionId, ft)
 		}()
 		p.sessions[sessionId] = nt
 	}
@@ -95,7 +94,7 @@ func (p *peer) answer(wm *waddell.Message) {
 	nt.Receive(string(msg.getData()))
 }
 
-func runUDTServer(ft *natty.FiveTuple) {
+func runUDTServer(peerId waddell.PeerId, sessionId uint32, ft *natty.FiveTuple) {
 	port, err := strconv.Atoi(strings.Split(ft.Local, ":")[1])
 	if err != nil {
 		log.Fatalf("Unable to extract local port from address %s: %s", ft.Local, err)
@@ -105,31 +104,17 @@ func runUDTServer(ft *natty.FiveTuple) {
 		PeerAddr: ft.Remote,
 		//DebugOut: os.Stderr,
 	}
+	go func() {
+		// Give server 2 seconds to come up
+		time.Sleep(2 * time.Second)
+		notifyClientOfServerReady(peerId, sessionId)
+	}()
 	err = udtServer.Run()
 	if err != nil {
 		log.Fatalf("Server error: %s", err)
 	}
 }
 
-func readUDP(peerId waddell.PeerId, sessionId uint32, ft *natty.FiveTuple) {
-	local, _, err := udpAddresses(ft)
-	if err != nil {
-		log.Fatalf("Unable to resolve UDP addresses: %s", err)
-	}
-	conn, err := net.ListenUDP("udp", local)
-	if err != nil {
-		log.Fatalf("Unable to listen on UDP: %s", err)
-	}
-	log.Printf("Listening for UDP packets at: %s", local)
-	// Let the client know that we're ready
+func notifyClientOfServerReady(peerId waddell.PeerId, sessionId uint32) {
 	wc.SendPieces(peerId, idToBytes(sessionId), []byte(READY))
-	b := make([]byte, 1024)
-	for {
-		n, addr, err := conn.ReadFrom(b)
-		if err != nil {
-			log.Fatalf("Unable to read from UDP: %s", err)
-		}
-		msg := string(b[:n])
-		log.Printf("Got UDP message from %s: '%s'", addr, msg)
-	}
 }
