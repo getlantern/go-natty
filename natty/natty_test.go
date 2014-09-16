@@ -36,6 +36,9 @@ func TestLocal(t *testing.T) {
 		},
 		nil)
 
+	var answererReady sync.WaitGroup
+	answererReady.Add(1)
+
 	var wg sync.WaitGroup
 	wg.Add(2)
 
@@ -57,6 +60,7 @@ func TestLocal(t *testing.T) {
 			t.Error("Offerer unable to resolve UDP addresses: %s", err)
 			return
 		}
+		answererReady.Wait()
 		conn, err := net.DialUDP("udp", local, remote)
 		if err != nil {
 			t.Errorf("Unable to dial UDP: %s", err)
@@ -94,6 +98,7 @@ func TestLocal(t *testing.T) {
 			t.Errorf("Answerer unable to listen on UDP: %s", err)
 			return
 		}
+		answererReady.Done()
 		b := make([]byte, 1024)
 		for {
 			n, addr, err := conn.ReadFrom(b)
