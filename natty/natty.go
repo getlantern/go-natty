@@ -223,9 +223,11 @@ func (natty *Natty) initCommand(params []string) error {
 	if natty.debugOut == nil {
 		// Discard stderr output by default
 		natty.debugOut = ioutil.Discard
-	} else {
-		params = append(params, "-debug")
 	}
+	// TODO: for some reason, we always need to run natty with the -debug flag,
+	// otherwise it doesn't seem to work.  Not sure if this is a problem in
+	// natty or in go-natty
+	params = append(params, "-debug")
 
 	nattyBytes, err := Asset("natty")
 	if err != nil {
