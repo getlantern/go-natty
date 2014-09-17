@@ -201,7 +201,9 @@ func (natty *Natty) doRun(params []string) (*FiveTuple, error) {
 	for {
 		select {
 		case result := <-natty.resultCh:
-			// Wait for peer to get 5 tuple before returning
+			// Wait for peer to get 5-tuple before returning.  If we didn't do
+			// this, our natty instance might stop running before the peer
+			// finishes its work to get its own 5-tuple.
 			<-natty.peerGotFiveTupleCh
 			return result, nil
 		case err := <-natty.errCh:
