@@ -39,21 +39,21 @@ type FiveTuple struct {
 
 // Natty is a NAT traversal utility.
 type Natty struct {
-	params          []string
-	send            func(msg string)
-	debugOut        io.Writer
-	cmd             *exec.Cmd
-	stdin           io.WriteCloser
-	stdout          io.ReadCloser
-	stdoutbuf       *bufio.Reader
-	stderr          io.ReadCloser
-	msgInCh         chan string
-	msgOutCh        chan string
-	peerGot5TupleCh chan bool
-	resultCh        chan *FiveTuple
-	errCh           chan error
-	nextFiveTupleCh chan *FiveTuple
-	nextErrCh       chan error
+	params             []string
+	send               func(msg string)
+	debugOut           io.Writer
+	cmd                *exec.Cmd
+	stdin              io.WriteCloser
+	stdout             io.ReadCloser
+	stdoutbuf          *bufio.Reader
+	stderr             io.ReadCloser
+	msgInCh            chan string
+	msgOutCh           chan string
+	peerGotFiveTupleCh chan bool
+	resultCh           chan *FiveTuple
+	errCh              chan error
+	nextFiveTupleCh    chan *FiveTuple
+	nextErrCh          chan error
 }
 
 // Offer runs a Natty as an Offerer, meaning that it will make an offer to
@@ -125,7 +125,7 @@ func (natty *Natty) FiveTupleTimeout(timeout time.Duration) (*FiveTuple, error) 
 func (natty *Natty) run(params []string) {
 	natty.msgInCh = make(chan string, 100)
 	natty.msgOutCh = make(chan string, 100)
-	natty.peerGot5TupleCh = make(chan bool)
+	natty.peerGotFiveTupleCh = make(chan bool)
 	natty.resultCh = make(chan *FiveTuple, 10)
 	natty.errCh = make(chan error, 10)
 	natty.nextFiveTupleCh = make(chan *FiveTuple, 10)
@@ -153,17 +153,7 @@ func (natty *Natty) run(params []string) {
 // know that natty is no longer running and whatever port it returned in the
 // FiveTuple can now be used for other things.
 func (natty *Natty) doRun(params []string) (*FiveTuple, error) {
-	defer func() {
-		if natty.stdin != nil {
-			natty.stdin.Close()
-		}
-		if natty.stdout != nil {
-			natty.stdout.Close()
-		}
-		if natty.stderr != nil {
-			natty.stderr.Close()
-		}
-	}()
+	defer natty.closePipes()
 
 	go natty.processStdout()
 	go natty.processStderr()
@@ -180,10 +170,13 @@ func (natty *Natty) doRun(params []string) (*FiveTuple, error) {
 	go func() {
 		for {
 			msg := <-natty.msgInCh
-			if is5Tuple(msg) {
-				natty.peerGot5TupleCh <- true
+
+			if isFiveTuple(msg) {
+				natty.peerGotFiveTupleCh <- true
 				continue
 			}
+
+			// Forward message to natty process
 			_, err := natty.stdin.Write([]byte(msg))
 			if err == nil {
 				_, err = natty.stdin.Write([]byte("\n"))
@@ -209,7 +202,7 @@ func (natty *Natty) doRun(params []string) (*FiveTuple, error) {
 		select {
 		case result := <-natty.resultCh:
 			// Wait for peer to get 5 tuple before returning
-			<-natty.peerGot5TupleCh
+			<-natty.peerGotFiveTupleCh
 			return result, nil
 		case err := <-natty.errCh:
 			if err != nil && err != io.EOF {
@@ -259,14 +252,18 @@ func (natty *Natty) initCommand(params []string) error {
 
 func (natty *Natty) processStdout() {
 	for {
+		// Read next message from natty
 		msg, err := natty.stdoutbuf.ReadString('\n')
 		if err != nil {
 			natty.errCh <- err
 			return
 		}
 
+		// Request send of message to peer
 		natty.msgOutCh <- msg
-		if is5Tuple(msg) {
+
+		if isFiveTuple(msg) {
+			// We got a 5-tuple!
 			fiveTuple := &FiveTuple{}
 			err = json.Unmarshal([]byte(msg), fiveTuple)
 			if err != nil {
@@ -283,6 +280,18 @@ func (natty *Natty) processStderr() {
 	natty.errCh <- err
 }
 
-func is5Tuple(msg string) bool {
+func (natty *Natty) closePipes() {
+	if natty.stdin != nil {
+		natty.stdin.Close()
+	}
+	if natty.stdout != nil {
+		natty.stdout.Close()
+	}
+	if natty.stderr != nil {
+		natty.stderr.Close()
+	}
+}
+
+func isFiveTuple(msg string) bool {
 	return strings.Contains(msg, "\"type\":\"5-tuple\"")
 }

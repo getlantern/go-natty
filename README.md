@@ -11,11 +11,11 @@ For docs:
 
 ## Demo
 
-There's a [demo application](tree/master/demo) available.  Right now it only
-works on OS X.  Binaries are available
+There's a [demo application](tree/master/demo) available. Right now it only
+works on OS X. Binaries are available
 [here](https://github.com/getlantern/go-natty/releases/download/demo-0.0.1/natty-demo-osx).
 
-The demo application allows running a client as well as a server peer.  The
+The demo application allows running a client as well as a server peer. The
 client will connect to the server and obtain its IP address by making a request
 to [ifconfig.me](http://ifconfig.me/ip).
 
