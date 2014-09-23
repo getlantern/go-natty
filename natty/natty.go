@@ -40,7 +40,6 @@ type FiveTuple struct {
 // Natty is a NAT traversal utility.
 type Natty struct {
 	params             []string
-	send               func(msg string)
 	debugOut           io.Writer
 	cmd                *exec.Cmd
 	stdin              io.WriteCloser
@@ -60,15 +59,11 @@ type Natty struct {
 // initiate an ICE session. Call FiveTuple() to get the FiveTuple resulting
 // from NAT traversal.
 //
-// send (required) is called whenever Natty has a message to send to the other
-// Natty.  Messages includes things such as SDP and ICE candidates.
-//
 // debugOut (optional) is an optional Writer to which debug output from Natty
 // will be written.
 //
-func Offer(send func(msg string), debugOut io.Writer) *Natty {
+func Offer(debugOut io.Writer) *Natty {
 	natty := &Natty{
-		send:     send,
 		debugOut: debugOut,
 	}
 	natty.run([]string{"-offer"})
@@ -79,25 +74,28 @@ func Offer(send func(msg string), debugOut io.Writer) *Natty {
 // initiate an ICE session. Call FiveTuple() to get the FiveTuple resulting
 // from NAT traversal.
 //
-// send (required) is called whenever Natty has a message to send to the other
-// Natty.  Messages includes things such as SDP and ICE candidates.
-//
 // debugOut (optional) is an optional Writer to which debug output from Natty
 // will be written.
 //
-func Answer(send func(msg string), debugOut io.Writer) *Natty {
+func Answer(debugOut io.Writer) *Natty {
 	natty := &Natty{
-		send:     send,
 		debugOut: debugOut,
 	}
 	natty.run([]string{})
 	return natty
 }
 
-// Receive is used to pass this Natty a message from the other Natty. This
-// method is buffered and will typically not block.
-func (natty *Natty) Receive(msg string) {
+// MsgIn is used to pass this Natty a message from the peer Natty. This method
+// is buffered and will typically not block.
+func (natty *Natty) MsgIn(msg string) {
 	natty.msgInCh <- msg
+}
+
+// MsgOut gets the next message to pass to the peer Natty.  If done is true, the
+// current message should be ignored and no more messages need to be read.
+func (natty *Natty) MsgOut() (msg string, done bool) {
+	m, ok := <-natty.msgOutCh
+	return m, !ok
 }
 
 // FiveTuple gets the FiveTuple from the NAT traversal, blocking until such is
@@ -125,7 +123,7 @@ func (natty *Natty) FiveTupleTimeout(timeout time.Duration) (*FiveTuple, error) 
 func (natty *Natty) run(params []string) {
 	natty.msgInCh = make(chan string, 100)
 	natty.msgOutCh = make(chan string, 100)
-	natty.peerGotFiveTupleCh = make(chan bool)
+	natty.peerGotFiveTupleCh = make(chan bool, 10)
 	natty.resultCh = make(chan *FiveTuple, 10)
 	natty.errCh = make(chan error, 10)
 	natty.nextFiveTupleCh = make(chan *FiveTuple, 10)
@@ -184,14 +182,6 @@ func (natty *Natty) doRun(params []string) (*FiveTuple, error) {
 			if err != nil {
 				natty.errCh <- err
 			}
-		}
-	}()
-
-	// Process outgoing messages
-	go func() {
-		for {
-			msg := <-natty.msgOutCh
-			natty.send(msg)
 		}
 	}()
 

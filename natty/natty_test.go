@@ -20,23 +20,8 @@ func TestLocal(t *testing.T) {
 	var offerer *Natty
 	var answerer *Natty
 
-	offerer = Offer(
-		func(msg string) {
-			// This would be done using a signaling server when talking to a
-			// remote Natty
-			log.Printf("Offerer -> Answerer: %s", msg)
-			answerer.Receive(msg)
-		},
-		nil)
-
-	answerer = Answer(
-		func(msg string) {
-			// This would be done using a signaling server when talking to a
-			// remote Natty
-			log.Printf("Answerer -> Offerer: %s", msg)
-			offerer.Receive(msg)
-		},
-		nil)
+	offerer = Offer(nil)
+	answerer = Answer(nil)
 
 	var answererReady sync.WaitGroup
 	answererReady.Add(1)
@@ -45,6 +30,19 @@ func TestLocal(t *testing.T) {
 	wg.Add(2)
 
 	// Offerer processing
+	go func() {
+		for {
+			// This would typically be done using a signaling server when
+			// talking to a remote Natty
+			msg, done := offerer.MsgOut()
+			if done {
+				return
+			}
+			log.Printf("Offerer -> Answerer: %s", msg)
+			answerer.MsgIn(msg)
+		}
+	}()
+
 	go func() {
 		defer wg.Done()
 		fiveTuple, err := offerer.FiveTuple()
@@ -78,6 +76,19 @@ func TestLocal(t *testing.T) {
 	}()
 
 	// Answerer processing
+	go func() {
+		for {
+			// This would typically be done using a signaling server when
+			// talking to a remote Natty
+			msg, done := answerer.MsgOut()
+			if done {
+				return
+			}
+			log.Printf("Answerer -> Offerer: %s", msg)
+			offerer.MsgIn(msg)
+		}
+	}()
+
 	go func() {
 		defer wg.Done()
 		fiveTuple, err := answerer.FiveTuple()
