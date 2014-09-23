@@ -91,9 +91,9 @@ func (natty *Natty) MsgIn(msg string) {
 	natty.msgInCh <- msg
 }
 
-// MsgOut gets the next message to pass to the peer Natty.  If done is true, the
-// current message should be ignored and no more messages need to be read.
-func (natty *Natty) MsgOut() (msg string, done bool) {
+// NextMsgOut gets the next message to pass to the peer Natty.  If done is true,
+// the current message should be ignored and no more messages need to be read.
+func (natty *Natty) NextMsgOut() (msg string, done bool) {
 	m, ok := <-natty.msgOutCh
 	return m, !ok
 }

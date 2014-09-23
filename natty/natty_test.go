@@ -31,19 +31,6 @@ func TestLocal(t *testing.T) {
 
 	// Offerer processing
 	go func() {
-		for {
-			// This would typically be done using a signaling server when
-			// talking to a remote Natty
-			msg, done := offerer.MsgOut()
-			if done {
-				return
-			}
-			log.Printf("Offerer -> Answerer: %s", msg)
-			answerer.MsgIn(msg)
-		}
-	}()
-
-	go func() {
 		defer wg.Done()
 		fiveTuple, err := offerer.FiveTuple()
 		if err != nil {
@@ -76,19 +63,6 @@ func TestLocal(t *testing.T) {
 	}()
 
 	// Answerer processing
-	go func() {
-		for {
-			// This would typically be done using a signaling server when
-			// talking to a remote Natty
-			msg, done := answerer.MsgOut()
-			if done {
-				return
-			}
-			log.Printf("Answerer -> Offerer: %s", msg)
-			offerer.MsgIn(msg)
-		}
-	}()
-
 	go func() {
 		defer wg.Done()
 		fiveTuple, err := answerer.FiveTuple()
@@ -128,6 +102,30 @@ func TestLocal(t *testing.T) {
 				log.Printf("Got message '%s', expected '%s'", msg, MESSAGE_TEXT)
 			}
 			return
+		}
+	}()
+
+	// "Signaling" - this would typically be done using a signaling server like
+	// waddell when talking to a remote Natty
+	go func() {
+		for {
+			msg, done := offerer.NextMsgOut()
+			if done {
+				return
+			}
+			log.Printf("Offerer -> Answerer: %s", msg)
+			answerer.MsgIn(msg)
+		}
+	}()
+
+	go func() {
+		for {
+			msg, done := answerer.NextMsgOut()
+			if done {
+				return
+			}
+			log.Printf("Answerer -> Offerer: %s", msg)
+			offerer.MsgIn(msg)
 		}
 	}()
 
