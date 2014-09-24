@@ -32,15 +32,9 @@ func runClient() {
 		log.Fatalf("Unable to parse PeerID for server %s: %s", *server, err)
 	}
 
-	nt := natty.Offer(
-		func(msgOut string) {
-			if *debug {
-				log.Printf("Sending %s", msgOut)
-			}
-			wc.SendPieces(serverId, idToBytes(sessionId), []byte(msgOut))
-		},
-		debugOut)
+	nt := natty.Offer(debugOut)
 
+	go sendMessagesForNatty(nt, serverId, sessionId)
 	go receiveMessagesForNatty(nt, sessionId)
 
 	ft, err := nt.FiveTuple()
@@ -50,6 +44,19 @@ func runClient() {
 	log.Printf("Got five tuple: %s", ft)
 	if <-serverReady {
 		writeUDP(ft)
+	}
+}
+
+func sendMessagesForNatty(nt *natty.Natty, serverId waddell.PeerId, sessionId uint32) {
+	for {
+		msgOut, done := nt.NextMsgOut()
+		if done {
+			return
+		}
+		if *debug {
+			log.Printf("Sending %s", msgOut)
+		}
+		wc.SendPieces(serverId, idToBytes(sessionId), []byte(msgOut))
 	}
 }
 
@@ -73,7 +80,7 @@ func receiveMessagesForNatty(nt *natty.Natty, sessionId uint32) {
 			// Server's ready!
 			serverReady <- true
 		} else {
-			nt.Receive(msgString)
+			nt.MsgIn(msgString)
 		}
 	}
 }

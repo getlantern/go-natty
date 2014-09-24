@@ -60,15 +60,23 @@ func (p *peer) answer(wm *waddell.Message) {
 			log.Printf("Creating new natty")
 		}
 		// Set up a new Natty session
-		nt = natty.Answer(
-			func(msgOut string) {
+		nt = natty.Answer(debugOut)
+		go func() {
+			// Send
+			for {
+				msgOut, done := nt.NextMsgOut()
+				if done {
+					return
+				}
 				if *debug {
 					log.Printf("Sending %s", msgOut)
 				}
 				wc.SendPieces(p.id, idToBytes(sessionId), []byte(msgOut))
-			},
-			debugOut)
+			}
+		}()
+
 		go func() {
+			// Receive
 			defer func() {
 				p.sessionsMutex.Lock()
 				defer p.sessionsMutex.Unlock()
@@ -88,7 +96,7 @@ func (p *peer) answer(wm *waddell.Message) {
 	if *debug {
 		log.Printf("Received: %s", msg.getData())
 	}
-	nt.Receive(string(msg.getData()))
+	nt.MsgIn(string(msg.getData()))
 }
 
 func readUDP(peerId waddell.PeerId, sessionId uint32, ft *natty.FiveTuple) {
