@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"os"
 	"sync"
 	"testing"
 	"time"
@@ -20,8 +21,8 @@ func TestLocal(t *testing.T) {
 	var offerer *Natty
 	var answerer *Natty
 
-	offerer = Offer(nil)
-	answerer = Answer(nil)
+	offerer = Offer(os.Stderr)
+	answerer = Answer(os.Stderr)
 
 	var answererReady sync.WaitGroup
 	answererReady.Add(1)
@@ -138,7 +139,7 @@ func TestLocal(t *testing.T) {
 	select {
 	case <-doneCh:
 		return
-	case <-time.After(10 * time.Second):
+	case <-time.After(1000 * time.Second):
 		t.Errorf("Test timed out")
 	}
 }
