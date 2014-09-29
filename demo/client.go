@@ -53,9 +53,7 @@ func sendMessagesForNatty(nt *natty.Natty, serverId waddell.PeerId, sessionId ui
 		if done {
 			return
 		}
-		if *debug {
-			log.Printf("Sending %s", msgOut)
-		}
+		log.Printf("Sending %s", msgOut)
 		wc.SendPieces(serverId, idToBytes(sessionId), []byte(msgOut))
 	}
 }
@@ -72,9 +70,7 @@ func receiveMessagesForNatty(nt *natty.Natty, sessionId uint32) {
 			log.Printf("Got message for unknown session id %d, skipping", msg.getSessionID())
 			continue
 		}
-		if *debug {
-			log.Printf("Received: %s", msg.getData())
-		}
+		log.Printf("Received: %s", msg.getData())
 		msgString := string(msg.getData())
 		if READY == msgString {
 			// Server's ready!

@@ -68,9 +68,7 @@ func (p *peer) answer(wm *waddell.Message) {
 				if done {
 					return
 				}
-				if *debug {
-					log.Printf("Sending %s", msgOut)
-				}
+				log.Printf("Sending %s", msgOut)
 				wc.SendPieces(p.id, idToBytes(sessionId), []byte(msgOut))
 			}
 		}()
@@ -93,9 +91,7 @@ func (p *peer) answer(wm *waddell.Message) {
 		}()
 		p.sessions[sessionId] = nt
 	}
-	if *debug {
-		log.Printf("Received: %s", msg.getData())
-	}
+	log.Printf("Received: %s", msg.getData())
 	nt.MsgIn(string(msg.getData()))
 }
 
