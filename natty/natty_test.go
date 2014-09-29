@@ -2,27 +2,135 @@ package natty
 
 import (
 	"fmt"
+	"io"
 	"log"
 	"net"
 	"os"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/getlantern/waddell"
 )
 
 const (
 	MESSAGE_TEXT = "Hello World"
+
+	WADDELL_ADDR = "localhost:19543"
 )
 
-// TestLocal starts up two local Natty instances that communicate with each
+// TestDirect starts up two local Natty instances that communicate with each
 // other directly.  Once connected, one Natty sends a UDP packet to the other
 // to make sure that the connection works.
-func TestLocal(t *testing.T) {
+func TestDirect(t *testing.T) {
+	doTest(t, func(offerer *Natty, answerer *Natty) {
+		go func() {
+			for {
+				msg, done := offerer.NextMsgOut()
+				if done {
+					return
+				}
+				log.Printf("Offerer -> Answerer: %s", msg)
+				answerer.MsgIn(msg)
+			}
+		}()
+
+		go func() {
+			for {
+				msg, done := answerer.NextMsgOut()
+				if done {
+					return
+				}
+				log.Printf("Answerer -> Offerer: %s", msg)
+				offerer.MsgIn(msg)
+			}
+		}()
+	})
+}
+
+// TestWaddell starts up two local Natty instances that communicate with each
+// other using waddell.  Once connected, one Natty sends a UDP packet to the
+// other to make sure that the connection works.
+func TestWaddell(t *testing.T) {
+	doTest(t, func(offerer *Natty, answerer *Natty) {
+		// Start a waddell server
+		server := &waddell.Server{}
+		log.Printf("Starting waddell at %s", WADDELL_ADDR)
+		listener, err := net.Listen("tcp", WADDELL_ADDR)
+		if err != nil {
+			t.Fatalf("Unable to listen at %s: %s", WADDELL_ADDR, err)
+		}
+		go func() {
+			err = server.Serve(listener)
+			if err != nil {
+				t.Fatalf("Unable to start waddell at %s: %s", WADDELL_ADDR, err)
+			}
+		}()
+
+		offererClient := makeWaddellClient(t)
+		answererClient := makeWaddellClient(t)
+
+		// Send from Offerer -> Answerer
+		go func() {
+			for {
+				msg, done := offerer.NextMsgOut()
+				if done {
+					return
+				}
+				log.Printf("Offerer -> Answerer: %s", msg)
+				offererClient.Send(answererClient.ID(), []byte(msg))
+			}
+		}()
+
+		// Receive to Offerer
+		go func() {
+			for {
+				b := make([]byte, 4096+waddell.WADDELL_OVERHEAD)
+				msg, err := offererClient.Receive(b)
+				if err != nil {
+					t.Fatalf("Offerer unable to receive message from waddell: %s", err)
+				}
+				offerer.MsgIn(string(msg.Body))
+			}
+		}()
+
+		// Send from Answerer -> Offerer
+		go func() {
+			for {
+				msg, done := answerer.NextMsgOut()
+				if done {
+					return
+				}
+				log.Printf("Answerer -> Offerer: %s", msg)
+				answererClient.Send(offererClient.ID(), []byte(msg))
+			}
+		}()
+
+		// Receive to Ansserer
+		go func() {
+			for {
+				b := make([]byte, 4096+waddell.WADDELL_OVERHEAD)
+				msg, err := answererClient.Receive(b)
+				if err != nil {
+					t.Fatalf("Answerer unable to receive message from waddell: %s", err)
+				}
+				answerer.MsgIn(string(msg.Body))
+			}
+		}()
+
+	})
+}
+
+func doTest(t *testing.T, signal func(*Natty, *Natty)) {
 	var offerer *Natty
 	var answerer *Natty
 
-	offerer = Offer(os.Stderr)
-	answerer = Answer(os.Stderr)
+	var debug io.Writer
+	if testing.Verbose() {
+		debug = os.Stderr
+	}
+	offerer = Offer(debug)
+	answerer = Answer(debug)
 
 	var answererReady sync.WaitGroup
 	answererReady.Add(1)
@@ -108,27 +216,8 @@ func TestLocal(t *testing.T) {
 
 	// "Signaling" - this would typically be done using a signaling server like
 	// waddell when talking to a remote Natty
-	go func() {
-		for {
-			msg, done := offerer.NextMsgOut()
-			if done {
-				return
-			}
-			log.Printf("Offerer -> Answerer: %s", msg)
-			answerer.MsgIn(msg)
-		}
-	}()
 
-	go func() {
-		for {
-			msg, done := answerer.NextMsgOut()
-			if done {
-				return
-			}
-			log.Printf("Answerer -> Offerer: %s", msg)
-			offerer.MsgIn(msg)
-		}
-	}()
+	signal(offerer, answerer)
 
 	doneCh := make(chan interface{})
 	go func() {
@@ -142,6 +231,18 @@ func TestLocal(t *testing.T) {
 	case <-time.After(1000 * time.Second):
 		t.Errorf("Test timed out")
 	}
+}
+
+func makeWaddellClient(t *testing.T) *waddell.Client {
+	conn, err := net.Dial("tcp", WADDELL_ADDR)
+	if err != nil {
+		t.Fatalf("Unable to dial waddell: %s", err)
+	}
+	wc, err := waddell.Connect(conn)
+	if err != nil {
+		t.Fatalf("Unable to connect to waddell: %s", err)
+	}
+	return wc
 }
 
 func udpAddresses(fiveTuple *FiveTuple) (*net.UDPAddr, *net.UDPAddr, error) {
