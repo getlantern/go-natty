@@ -37,32 +37,35 @@ type FiveTuple struct {
 	Remote string
 }
 
-// Natty is a NAT traversal utility.
+// Natty is a NAT traversal utility. It does a single NAT-traversal and makes
+// the result available via the methods FiveTuple() and FiveTupleTimeout().
+// Consumer should make sure to call Close() after finishing with this Natty
+// in order to make sure the underlying natty process and associated resources
+// are closed.
 type Natty struct {
-	params             []string
-	debugOut           io.Writer
-	cmd                *exec.Cmd
-	stdin              io.WriteCloser
-	stdout             io.ReadCloser
-	stdoutbuf          *bufio.Reader
-	stderr             io.ReadCloser
-	msgInCh            chan string
-	msgOutCh           chan string
-	peerGotFiveTupleCh chan bool
-	resultCh           chan *FiveTuple
-	errCh              chan error
-	nextFiveTupleCh    chan *FiveTuple
-	nextErrCh          chan error
-	finalFiveTuple     *FiveTuple
-	finalErr           error
-	resultMutex        sync.Mutex
+	debugOut           io.Writer       // target for output from natty's stderr
+	cmd                *exec.Cmd       // the natty command
+	stdin              io.WriteCloser  // pipe to natty's stdin
+	stdout             io.ReadCloser   // pipe from natty's stdout
+	stdoutbuf          *bufio.Reader   // buffered stdout
+	stderr             io.ReadCloser   // pipe from natty's stderr
+	msgInCh            chan string     // channel for messages inbound to this Natty
+	msgOutCh           chan string     // channel for messages outbound from this Natty
+	peerGotFiveTupleCh chan bool       // channel to signal once we know that our peer received their own FiveTuple
+	fiveTupleCh        chan *FiveTuple // intermediary channel for the FiveTuple emitted by the natty command
+	errCh              chan error      // intermediary channel for any error encountered while running natty
+	fiveTupleOutCh     chan *FiveTuple // channel for FiveTuple output
+	errOutCh           chan error      // channel for error output
+	fiveTupleOut       *FiveTuple      // the output FiveTuple
+	errOut             error           // the output error
+	outMutex           sync.Mutex      // mutex for synchronizing access to output variables
 }
 
 // Offer runs a Natty as an Offerer, meaning that it will make an offer to
-// initiate an ICE session. Call FiveTuple() to get the FiveTuple resulting
-// from NAT traversal.
+// initiate an ICE session. Call FiveTuple() or FiveTupleTimeout() to get the
+// FiveTuple resulting from NAT traversal.
 //
-// debugOut (optional) is an optional Writer to which debug output from Natty
+// debugOut (optional) is an optional io.Writer to which debug output from Natty
 // will be written.
 //
 func Offer(debugOut io.Writer) *Natty {
@@ -74,10 +77,10 @@ func Offer(debugOut io.Writer) *Natty {
 }
 
 // Answer runs a Natty as an Answerer, meaning that it will accept offers to
-// initiate an ICE session. Call FiveTuple() to get the FiveTuple resulting
-// from NAT traversal.
+// initiate an ICE session. Call FiveTuple() or FiveTupleTimeout() to get the
+// FiveTuple resulting from NAT traversal.
 //
-// debugOut (optional) is an optional Writer to which debug output from Natty
+// debugOut (optional) is an optional io.Writer to which debug output from Natty
 // will be written.
 //
 func Answer(debugOut io.Writer) *Natty {
@@ -95,7 +98,8 @@ func (natty *Natty) MsgIn(msg string) {
 }
 
 // NextMsgOut gets the next message to pass to the peer Natty.  If done is true,
-// the current message should be ignored and no more messages need to be read.
+// there are no more messages to be read, and the currently returned message
+// should be ignored.
 func (natty *Natty) NextMsgOut() (msg string, done bool) {
 	m, ok := <-natty.msgOutCh
 	return m, !ok
@@ -110,28 +114,28 @@ func (natty *Natty) FiveTuple() (*FiveTuple, error) {
 // FiveTupleTimeout gets the FiveTuple from the NAT traversal, blocking until
 // such is available or the timeout is hit.
 func (natty *Natty) FiveTupleTimeout(timeout time.Duration) (*FiveTuple, error) {
-	natty.resultMutex.Lock()
-	defer natty.resultMutex.Unlock()
+	natty.outMutex.Lock()
+	defer natty.outMutex.Unlock()
 
-	if natty.finalFiveTuple == nil && natty.finalErr == nil {
-		// We don't have a result yet, get one
+	if natty.fiveTupleOut == nil && natty.errOut == nil {
+		// We don't have a result yet, wait for one
 		select {
-		case ft := <-natty.nextFiveTupleCh:
-			natty.finalFiveTuple = ft
-		case err := <-natty.nextErrCh:
-			natty.finalErr = err
+		case ft := <-natty.fiveTupleOutCh:
+			natty.fiveTupleOut = ft
+		case err := <-natty.errOutCh:
+			natty.errOut = err
 		case <-time.After(timeout):
 			// Return an error, but don't store it (lets caller try again)
 			return nil, fmt.Errorf("Timed out waiting for five-tuple")
 		}
 	}
 
-	return natty.finalFiveTuple, natty.finalErr
+	return natty.fiveTupleOut, natty.errOut
 }
 
-// Close closes this natty, terminating any outstanding natty process by sending
-// SIGKILL. Close only returns once the natty process has terminated, at which
-// point any ports that it bound should be available for use.
+// Close closes this Natty, terminating any outstanding Natty process by sending
+// SIGKILL. Close blocks until the natty process has terminated, at which point
+// any ports that it bound should be available for use.
 func (natty *Natty) Close() error {
 	natty.closePipes()
 
@@ -150,32 +154,32 @@ func (natty *Natty) run(params []string) {
 
 	// Note - these channels are a little oversized to prevent deadlocks
 	natty.peerGotFiveTupleCh = make(chan bool, 10)
-	natty.resultCh = make(chan *FiveTuple, 10)
+	natty.fiveTupleCh = make(chan *FiveTuple, 10)
 	natty.errCh = make(chan error, 10)
-	natty.nextFiveTupleCh = make(chan *FiveTuple, 10)
-	natty.nextErrCh = make(chan error, 10)
+	natty.fiveTupleOutCh = make(chan *FiveTuple, 10)
+	natty.errOutCh = make(chan error, 10)
 
 	err := natty.initCommand(params)
 
 	go func() {
 		if err != nil {
-			natty.nextErrCh <- err
+			natty.errOutCh <- err
 			return
 		}
 
 		ft, err := natty.doRun(params)
 		// Once doRun is finished, inform client of the FiveTuple
 		if err != nil {
-			natty.nextErrCh <- err
+			natty.errOutCh <- err
 		} else {
-			natty.nextFiveTupleCh <- ft
+			natty.fiveTupleOutCh <- ft
 		}
 	}()
 }
 
-// doRun does the running, including resource cleanup.  Once doRun returns, we
-// know that natty is no longer running and whatever port it returned in the
-// FiveTuple can now be used for other things.
+// doRun does the running, including resource cleanup.  doRun blocks until
+// Close() has finished, meaning that natty is no longer running and whatever
+// port it returned in the FiveTuple can now be used for other things.
 func (natty *Natty) doRun(params []string) (*FiveTuple, error) {
 	defer natty.Close()
 
@@ -208,10 +212,10 @@ func (natty *Natty) doRun(params []string) (*FiveTuple, error) {
 
 	for {
 		select {
-		case result := <-natty.resultCh:
-			// Wait for peer to get 5-tuple before returning.  If we didn't do
+		case result := <-natty.fiveTupleCh:
+			// Wait for peer to get FiveTuple before returning.  If we didn't do
 			// this, our natty instance might stop running before the peer
-			// finishes its work to get its own 5-tuple.
+			// finishes its work to get its own FiveTuple.
 			<-natty.peerGotFiveTupleCh
 			return result, nil
 		case err := <-natty.errCh:
@@ -222,15 +226,15 @@ func (natty *Natty) doRun(params []string) (*FiveTuple, error) {
 	}
 }
 
+// initCommand sets up the natty command
 func (natty *Natty) initCommand(params []string) error {
 	if natty.debugOut == nil {
 		// Discard stderr output by default
 		natty.debugOut = ioutil.Discard
+	} else {
+		// Tell natty to log debug output
+		params = append(params, "-debug")
 	}
-	// TODO: for some reason, we always need to run natty with the -debug flag,
-	// otherwise it doesn't seem to work.  Not sure if this is a problem in
-	// natty or in go-natty
-	params = append(params, "-debug")
 
 	nattyBytes, err := Asset("natty")
 	if err != nil {
@@ -260,6 +264,8 @@ func (natty *Natty) initCommand(params []string) error {
 	return nil
 }
 
+// processStdout reads the output from natty and sends it to the msgOutCh. If
+// it finds a FiveTuple, it records that.
 func (natty *Natty) processStdout() {
 	for {
 		// Read next message from natty
@@ -273,18 +279,20 @@ func (natty *Natty) processStdout() {
 		natty.msgOutCh <- msg
 
 		if isFiveTuple(msg) {
-			// We got a 5-tuple!
+			// We got a FiveTuple!
 			fiveTuple := &FiveTuple{}
 			err = json.Unmarshal([]byte(msg), fiveTuple)
 			if err != nil {
 				natty.errCh <- err
 				return
 			}
-			natty.resultCh <- fiveTuple
+			natty.fiveTupleCh <- fiveTuple
 		}
 	}
 }
 
+// processStderr copies the output from natty's stderr to the configured
+// DebugOut
 func (natty *Natty) processStderr() {
 	_, err := io.Copy(natty.debugOut, natty.stderr)
 	natty.errCh <- err
