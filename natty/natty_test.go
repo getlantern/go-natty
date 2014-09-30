@@ -145,11 +145,27 @@ func doTest(t *testing.T, signal func(*Natty, *Natty)) {
 	// Offerer processing
 	go func() {
 		defer wg.Done()
-		fiveTuple, err := offerer.FiveTuple()
+		// Try it with a really short timeout (should error)
+		fiveTuple, err := offerer.FiveTupleTimeout(5 * time.Millisecond)
+		if err == nil {
+			t.Errorf("Really short timeout should have given error")
+		}
+
+		// Try it again without timeout
+		fiveTuple, err = offerer.FiveTuple()
 		if err != nil {
 			t.Errorf("Offerer had error: %s", err)
 			return
 		}
+
+		// Call it again to make sure we're getting the same 5-tuple
+		fiveTupleAgain, err := offerer.FiveTuple()
+		if fiveTupleAgain.Local != fiveTuple.Local ||
+			fiveTupleAgain.Remote != fiveTuple.Remote ||
+			fiveTupleAgain.Proto != fiveTuple.Proto {
+			t.Errorf("2nd 5-tuple didn't match original")
+		}
+
 		log.Printf("Offerer got 5 tuple: %s", fiveTuple)
 		if fiveTuple.Proto != UDP {
 			t.Errorf("Protocol was %s instead of udp", fiveTuple.Proto)
@@ -178,7 +194,7 @@ func doTest(t *testing.T, signal func(*Natty, *Natty)) {
 	// Answerer processing
 	go func() {
 		defer wg.Done()
-		fiveTuple, err := answerer.FiveTuple()
+		fiveTuple, err := answerer.FiveTupleTimeout(5 * time.Second)
 		if err != nil {
 			t.Errorf("Answerer had error: %s", err)
 			return

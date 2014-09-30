@@ -13,6 +13,7 @@ import (
 	"io/ioutil"
 	"os/exec"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/oxtoacart/byteexec"
@@ -52,6 +53,9 @@ type Natty struct {
 	errCh              chan error
 	nextFiveTupleCh    chan *FiveTuple
 	nextErrCh          chan error
+	finalFiveTuple     *FiveTuple
+	finalErr           error
+	resultMutex        sync.Mutex
 }
 
 // Offer runs a Natty as an Offerer, meaning that it will make an offer to
@@ -98,31 +102,38 @@ func (natty *Natty) NextMsgOut() (msg string, done bool) {
 }
 
 // FiveTuple gets the FiveTuple from the NAT traversal, blocking until such is
-// available.  FiveTuple can only be called once!
+// available.
 func (natty *Natty) FiveTuple() (*FiveTuple, error) {
 	return natty.FiveTupleTimeout(reallyHighTimeout)
 }
 
 // FiveTupleTimeout gets the FiveTuple from the NAT traversal, blocking until
-// such is available or the timeout is hit.  FiveTupleTimeout can only be called
-// once!
+// such is available or the timeout is hit.
 func (natty *Natty) FiveTupleTimeout(timeout time.Duration) (*FiveTuple, error) {
-	select {
-	case ft := <-natty.nextFiveTupleCh:
-		return ft, nil
-	case err := <-natty.nextErrCh:
-		return nil, err
-	case <-time.After(timeout):
-		natty.Close()
-		return nil, fmt.Errorf("Timed out waiting for five-tuple")
+	natty.resultMutex.Lock()
+	defer natty.resultMutex.Unlock()
+
+	if natty.finalFiveTuple == nil && natty.finalErr == nil {
+		// We don't have a result yet, get one
+		select {
+		case ft := <-natty.nextFiveTupleCh:
+			natty.finalFiveTuple = ft
+		case err := <-natty.nextErrCh:
+			natty.finalErr = err
+		case <-time.After(timeout):
+			// Return an error, but don't store it (lets caller try again)
+			return nil, fmt.Errorf("Timed out waiting for five-tuple")
+		}
 	}
+
+	return natty.finalFiveTuple, natty.finalErr
 }
 
 // Close closes this natty, terminating any outstanding natty process by sending
 // SIGKILL. Close only returns once the natty process has terminated, at which
 // point any ports that it bound should be available for use.
 func (natty *Natty) Close() error {
-	defer natty.closePipes()
+	natty.closePipes()
 
 	if natty.cmd != nil && natty.cmd.Process != nil {
 		natty.cmd.Process.Kill()
