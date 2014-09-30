@@ -83,7 +83,7 @@ func receiveMessages(t *natty.Traversal, traversalId uint32) {
 }
 
 func writeUDP(ft *natty.FiveTuple) {
-	local, remote, err := udpAddresses(ft)
+	local, remote, err := ft.UDPAddrs()
 	if err != nil {
 		log.Fatalf("Unable to resolve UDP addresses: %s", err)
 	}

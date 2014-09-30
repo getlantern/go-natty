@@ -95,7 +95,7 @@ func (p *peer) answer(wm *waddell.Message) {
 }
 
 func readUDP(peerId waddell.PeerId, traversalId uint32, ft *natty.FiveTuple) {
-	local, _, err := udpAddresses(ft)
+	local, _, err := ft.UDPAddrs()
 	if err != nil {
 		log.Fatalf("Unable to resolve UDP addresses: %s", err)
 	}
