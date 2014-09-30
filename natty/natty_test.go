@@ -1,7 +1,6 @@
 package natty
 
 import (
-	"fmt"
 	"io"
 	"log"
 	"net"
@@ -22,6 +21,8 @@ const (
 // TestDirect starts up two local Traversals that communicate with each other
 // directly.  Once connected, one peer sends a UDP packet to the other to make
 // sure that the connection works.
+//
+// Run test with -v flag to get debug output from natty.
 func TestDirect(t *testing.T) {
 	doTest(t, func(offer *Traversal, answer *Traversal) {
 		go func() {
@@ -51,6 +52,8 @@ func TestDirect(t *testing.T) {
 // TestWaddell starts up two local Traversals that communicate with each other
 // using a local waddell server.  Once connected, one peer sends a UDP packet to
 // the other to make sure that the connection works.
+//
+// Run test with -v flag to get debug output from natty.
 func TestWaddell(t *testing.T) {
 	doTest(t, func(offer *Traversal, answer *Traversal) {
 		// Start a waddell server
@@ -171,7 +174,7 @@ func doTest(t *testing.T, signal func(*Traversal, *Traversal)) {
 			t.Errorf("Protocol was %s instead of udp", fiveTuple.Proto)
 			return
 		}
-		local, remote, err := udpAddresses(fiveTuple)
+		local, remote, err := fiveTuple.UDPAddrs()
 		if err != nil {
 			t.Error("offer unable to resolve UDP addresses: %s", err)
 			return
@@ -204,7 +207,7 @@ func doTest(t *testing.T, signal func(*Traversal, *Traversal)) {
 			return
 		}
 		log.Printf("answer got FiveTuple: %s", fiveTuple)
-		local, _, err := udpAddresses(fiveTuple)
+		local, _, err := fiveTuple.UDPAddrs()
 		if err != nil {
 			t.Errorf("Error in answer: %s", err)
 			return
@@ -263,19 +266,4 @@ func makeWaddellClient(t *testing.T) *waddell.Client {
 		t.Fatalf("Unable to connect to waddell: %s", err)
 	}
 	return wc
-}
-
-func udpAddresses(fiveTuple *FiveTuple) (*net.UDPAddr, *net.UDPAddr, error) {
-	if fiveTuple.Proto != UDP {
-		return nil, nil, fmt.Errorf("FiveTuple.Proto was not UDP!: %s", fiveTuple.Proto)
-	}
-	local, err := net.ResolveUDPAddr("udp", fiveTuple.Local)
-	if err != nil {
-		return nil, nil, fmt.Errorf("Unable to resolve local UDP address %s: %s", fiveTuple.Local)
-	}
-	remote, err := net.ResolveUDPAddr("udp", fiveTuple.Remote)
-	if err != nil {
-		return nil, nil, fmt.Errorf("Unable to resolve remote UDP address %s: %s", fiveTuple.Remote)
-	}
-	return local, remote, nil
 }

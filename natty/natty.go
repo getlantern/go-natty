@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"net"
 	"os/exec"
 	"strings"
 	"sync"
@@ -35,6 +36,24 @@ type FiveTuple struct {
 	Proto  Protocol
 	Local  string
 	Remote string
+}
+
+// UDPAddrs returns a pair of UDPAddrs representing the Local and Remote
+// addresses of this FiveTuple. If the FiveTuple's Proto is not UDP, this method
+// returns an error.
+func (ft *FiveTuple) UDPAddrs() (*net.UDPAddr, *net.UDPAddr, error) {
+	if ft.Proto != UDP {
+		return nil, nil, fmt.Errorf("FiveTuple.Proto was not UDP!: %s", ft.Proto)
+	}
+	local, err := net.ResolveUDPAddr("udp", ft.Local)
+	if err != nil {
+		return nil, nil, fmt.Errorf("Unable to resolve local UDP address %s: %s", ft.Local)
+	}
+	remote, err := net.ResolveUDPAddr("udp", ft.Remote)
+	if err != nil {
+		return nil, nil, fmt.Errorf("Unable to resolve remote UDP address %s: %s", ft.Remote)
+	}
+	return local, remote, nil
 }
 
 // Traversal represents a single NAT traversal using natty, whose result is
