@@ -56,9 +56,7 @@ func (p *peer) answer(wm *waddell.Message) {
 	sessionId := msg.getSessionID()
 	nt := p.sessions[sessionId]
 	if nt == nil {
-		if *debug {
-			log.Printf("Creating new natty")
-		}
+		log.Printf("Creating new natty for session id: %d", sessionId)
 		// Set up a new Natty session
 		nt = natty.Answer(debugOut)
 		go func() {
@@ -81,9 +79,10 @@ func (p *peer) answer(wm *waddell.Message) {
 				delete(p.sessions, sessionId)
 			}()
 
-			ft, err := nt.FiveTuple()
+			ft, err := nt.FiveTupleTimeout(TIMEOUT)
 			if err != nil {
 				log.Printf("Unable to answer session %d: %s", sessionId, err)
+				return
 			}
 
 			log.Printf("Got five tuple: %s", ft)
@@ -91,7 +90,7 @@ func (p *peer) answer(wm *waddell.Message) {
 		}()
 		p.sessions[sessionId] = nt
 	}
-	log.Printf("Received: %s", msg.getData())
+	log.Printf("Received for session id %d: %s", sessionId, msg.getData())
 	nt.MsgIn(string(msg.getData()))
 }
 

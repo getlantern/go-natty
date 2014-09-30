@@ -13,7 +13,6 @@ import (
 	"io/ioutil"
 	"os/exec"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/oxtoacart/byteexec"
@@ -114,8 +113,22 @@ func (natty *Natty) FiveTupleTimeout(timeout time.Duration) (*FiveTuple, error) 
 	case err := <-natty.nextErrCh:
 		return nil, err
 	case <-time.After(timeout):
+		natty.Close()
 		return nil, fmt.Errorf("Timed out waiting for five-tuple")
 	}
+}
+
+// Close closes this natty, terminating any outstanding natty process by sending
+// SIGKILL. Close only returns once the natty process has terminated, at which
+// point any ports that it bound should be available for use.
+func (natty *Natty) Close() error {
+	defer natty.closePipes()
+
+	if natty.cmd != nil && natty.cmd.Process != nil {
+		natty.cmd.Process.Kill()
+		natty.cmd.Process.Wait()
+	}
+	return nil
 }
 
 // run runs the Natty command to obtain a FiveTuple. The actual running of
@@ -123,6 +136,8 @@ func (natty *Natty) FiveTupleTimeout(timeout time.Duration) (*FiveTuple, error) 
 func (natty *Natty) run(params []string) {
 	natty.msgInCh = make(chan string, 100)
 	natty.msgOutCh = make(chan string, 100)
+
+	// Note - these channels are a little oversized to prevent deadlocks
 	natty.peerGotFiveTupleCh = make(chan bool, 10)
 	natty.resultCh = make(chan *FiveTuple, 10)
 	natty.errCh = make(chan error, 10)
@@ -151,18 +166,13 @@ func (natty *Natty) run(params []string) {
 // know that natty is no longer running and whatever port it returned in the
 // FiveTuple can now be used for other things.
 func (natty *Natty) doRun(params []string) (*FiveTuple, error) {
-	defer natty.closePipes()
+	defer natty.Close()
 
 	go natty.processStdout()
 	go natty.processStderr()
 
-	// Run the natty command
-	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		natty.errCh <- natty.cmd.Run()
-		wg.Done()
-	}()
+	// Start the natty command
+	natty.errCh <- natty.cmd.Start()
 
 	// Process incoming messages
 	go func() {
@@ -184,9 +194,6 @@ func (natty *Natty) doRun(params []string) (*FiveTuple, error) {
 			}
 		}
 	}()
-
-	// Wait for natty process to finish before returning from this function
-	defer wg.Wait()
 
 	for {
 		select {

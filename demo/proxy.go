@@ -8,6 +8,7 @@ import (
 	"log"
 	"net"
 	"os"
+	"time"
 
 	"github.com/getlantern/go-natty/natty"
 	"github.com/getlantern/waddell"
@@ -18,6 +19,8 @@ const (
 	MAX_MESSAGE_SIZE = 4096
 
 	READY = "READY"
+
+	TIMEOUT = 15 * time.Second
 )
 
 var (

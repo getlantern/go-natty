@@ -129,8 +129,12 @@ func doTest(t *testing.T, signal func(*Natty, *Natty)) {
 	if testing.Verbose() {
 		debug = os.Stderr
 	}
+
 	offerer = Offer(debug)
+	defer offerer.Close()
+
 	answerer = Answer(debug)
+	defer answerer.Close()
 
 	var answererReady sync.WaitGroup
 	answererReady.Add(1)

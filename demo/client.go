@@ -27,6 +27,7 @@ func runClient() {
 	}
 	log.Printf("Starting client, connecting to server %s ...", *server)
 	sessionId := uint32(rand.Int31())
+	log.Printf("Using session id: %d", sessionId)
 	serverId, err := waddell.PeerIdFromString(*server)
 	if err != nil {
 		log.Fatalf("Unable to parse PeerID for server %s: %s", *server, err)
@@ -37,7 +38,7 @@ func runClient() {
 	go sendMessagesForNatty(nt, serverId, sessionId)
 	go receiveMessagesForNatty(nt, sessionId)
 
-	ft, err := nt.FiveTuple()
+	ft, err := nt.FiveTupleTimeout(TIMEOUT)
 	if err != nil {
 		log.Fatalf("Unable to offer: %s", err)
 	}
