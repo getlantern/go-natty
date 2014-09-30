@@ -10,9 +10,9 @@ import (
 )
 
 type peer struct {
-	id            waddell.PeerId
-	sessions      map[uint32]*natty.Natty
-	sessionsMutex sync.Mutex
+	id              waddell.PeerId
+	traversals      map[uint32]*natty.Traversal
+	traversalsMutex sync.Mutex
 }
 
 var (
@@ -41,8 +41,8 @@ func answer(wm *waddell.Message) {
 	p := peers[wm.From]
 	if p == nil {
 		p = &peer{
-			id:       wm.From,
-			sessions: make(map[uint32]*natty.Natty),
+			id:         wm.From,
+			traversals: make(map[uint32]*natty.Traversal),
 		}
 		peers[wm.From] = p
 	}
@@ -50,51 +50,51 @@ func answer(wm *waddell.Message) {
 }
 
 func (p *peer) answer(wm *waddell.Message) {
-	p.sessionsMutex.Lock()
-	defer p.sessionsMutex.Unlock()
+	p.traversalsMutex.Lock()
+	defer p.traversalsMutex.Unlock()
 	msg := message(wm.Body)
-	sessionId := msg.getSessionID()
-	nt := p.sessions[sessionId]
-	if nt == nil {
-		log.Printf("Creating new natty for session id: %d", sessionId)
-		// Set up a new Natty session
-		nt = natty.Answer(debugOut)
+	traversalId := msg.getTraversalId()
+	t := p.traversals[traversalId]
+	if t == nil {
+		log.Printf("Answering traversal: %d", traversalId)
+		// Set up a new Natty traversal
+		t = natty.Answer(debugOut)
 		go func() {
 			// Send
 			for {
-				msgOut, done := nt.NextMsgOut()
+				msgOut, done := t.NextMsgOut()
 				if done {
 					return
 				}
 				log.Printf("Sending %s", msgOut)
-				wc.SendPieces(p.id, idToBytes(sessionId), []byte(msgOut))
+				wc.SendPieces(p.id, idToBytes(traversalId), []byte(msgOut))
 			}
 		}()
 
 		go func() {
 			// Receive
 			defer func() {
-				p.sessionsMutex.Lock()
-				defer p.sessionsMutex.Unlock()
-				delete(p.sessions, sessionId)
+				p.traversalsMutex.Lock()
+				defer p.traversalsMutex.Unlock()
+				delete(p.traversals, traversalId)
 			}()
 
-			ft, err := nt.FiveTupleTimeout(TIMEOUT)
+			ft, err := t.FiveTupleTimeout(TIMEOUT)
 			if err != nil {
-				log.Printf("Unable to answer session %d: %s", sessionId, err)
+				log.Printf("Unable to answer traversal %d: %s", traversalId, err)
 				return
 			}
 
 			log.Printf("Got five tuple: %s", ft)
-			go readUDP(p.id, sessionId, ft)
+			go readUDP(p.id, traversalId, ft)
 		}()
-		p.sessions[sessionId] = nt
+		p.traversals[traversalId] = t
 	}
-	log.Printf("Received for session id %d: %s", sessionId, msg.getData())
-	nt.MsgIn(string(msg.getData()))
+	log.Printf("Received for traversal %d: %s", traversalId, msg.getData())
+	t.MsgIn(string(msg.getData()))
 }
 
-func readUDP(peerId waddell.PeerId, sessionId uint32, ft *natty.FiveTuple) {
+func readUDP(peerId waddell.PeerId, traversalId uint32, ft *natty.FiveTuple) {
 	local, _, err := udpAddresses(ft)
 	if err != nil {
 		log.Fatalf("Unable to resolve UDP addresses: %s", err)
@@ -104,7 +104,7 @@ func readUDP(peerId waddell.PeerId, sessionId uint32, ft *natty.FiveTuple) {
 		log.Fatalf("Unable to listen on UDP: %s", err)
 	}
 	log.Printf("Listening for UDP packets at: %s", local)
-	notifyClientOfServerReady(peerId, sessionId)
+	notifyClientOfServerReady(peerId, traversalId)
 	b := make([]byte, 1024)
 	for {
 		n, addr, err := conn.ReadFrom(b)
@@ -116,6 +116,6 @@ func readUDP(peerId waddell.PeerId, sessionId uint32, ft *natty.FiveTuple) {
 	}
 }
 
-func notifyClientOfServerReady(peerId waddell.PeerId, sessionId uint32) {
-	wc.SendPieces(peerId, idToBytes(sessionId), []byte(READY))
+func notifyClientOfServerReady(peerId waddell.PeerId, traversalId uint32) {
+	wc.SendPieces(peerId, idToBytes(traversalId), []byte(READY))
 }

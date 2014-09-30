@@ -35,14 +35,14 @@ var (
 	debugOut io.Writer
 )
 
-// message represents a message exchanged during a NAT traversal session
+// message represents a message exchanged during a NAT traversal
 type message []byte
 
-func (msg message) setSessionID(id uint32) {
+func (msg message) setTraversalId(id uint32) {
 	endianness.PutUint32(msg[:4], id)
 }
 
-func (msg message) getSessionID() uint32 {
+func (msg message) getTraversalId() uint32 {
 	return endianness.Uint32(msg[:4])
 }
 

@@ -26,19 +26,19 @@ func runClient() {
 		return
 	}
 	log.Printf("Starting client, connecting to server %s ...", *server)
-	sessionId := uint32(rand.Int31())
-	log.Printf("Using session id: %d", sessionId)
+	traversalId := uint32(rand.Int31())
+	log.Printf("Starting traversal: %d", traversalId)
 	serverId, err := waddell.PeerIdFromString(*server)
 	if err != nil {
 		log.Fatalf("Unable to parse PeerID for server %s: %s", *server, err)
 	}
 
-	nt := natty.Offer(debugOut)
+	t := natty.Offer(debugOut)
 
-	go sendMessagesForNatty(nt, serverId, sessionId)
-	go receiveMessagesForNatty(nt, sessionId)
+	go sendMessages(t, serverId, traversalId)
+	go receiveMessages(t, traversalId)
 
-	ft, err := nt.FiveTupleTimeout(TIMEOUT)
+	ft, err := t.FiveTupleTimeout(TIMEOUT)
 	if err != nil {
 		log.Fatalf("Unable to offer: %s", err)
 	}
@@ -48,18 +48,18 @@ func runClient() {
 	}
 }
 
-func sendMessagesForNatty(nt *natty.Natty, serverId waddell.PeerId, sessionId uint32) {
+func sendMessages(t *natty.Traversal, serverId waddell.PeerId, traversalId uint32) {
 	for {
-		msgOut, done := nt.NextMsgOut()
+		msgOut, done := t.NextMsgOut()
 		if done {
 			return
 		}
 		log.Printf("Sending %s", msgOut)
-		wc.SendPieces(serverId, idToBytes(sessionId), []byte(msgOut))
+		wc.SendPieces(serverId, idToBytes(traversalId), []byte(msgOut))
 	}
 }
 
-func receiveMessagesForNatty(nt *natty.Natty, sessionId uint32) {
+func receiveMessages(t *natty.Traversal, traversalId uint32) {
 	b := make([]byte, MAX_MESSAGE_SIZE+waddell.WADDELL_OVERHEAD)
 	for {
 		wm, err := wc.Receive(b)
@@ -67,8 +67,8 @@ func receiveMessagesForNatty(nt *natty.Natty, sessionId uint32) {
 			log.Fatalf("Unable to read message from waddell: %s", err)
 		}
 		msg := message(wm.Body)
-		if msg.getSessionID() != sessionId {
-			log.Printf("Got message for unknown session id %d, skipping", msg.getSessionID())
+		if msg.getTraversalId() != traversalId {
+			log.Printf("Got message for unknown traversal %d, skipping", msg.getTraversalId())
 			continue
 		}
 		log.Printf("Received: %s", msg.getData())
@@ -77,7 +77,7 @@ func receiveMessagesForNatty(nt *natty.Natty, sessionId uint32) {
 			// Server's ready!
 			serverReady <- true
 		} else {
-			nt.MsgIn(msgString)
+			t.MsgIn(msgString)
 		}
 	}
 }
@@ -92,7 +92,7 @@ func writeUDP(ft *natty.FiveTuple) {
 		log.Fatalf("Unable to dial UDP: %s", err)
 	}
 	for {
-		msg := fmt.Sprintf("Hello from %s", ft.Local)
+		msg := fmt.Sprintf("Hello from %s to %s", ft.Local, ft.Remote)
 		log.Printf("Sending UDP message: %s", msg)
 		_, err := conn.Write([]byte(msg))
 		if err != nil {
