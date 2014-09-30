@@ -41,19 +41,21 @@ type FiveTuple struct {
 // UDPAddrs returns a pair of UDPAddrs representing the Local and Remote
 // addresses of this FiveTuple. If the FiveTuple's Proto is not UDP, this method
 // returns an error.
-func (ft *FiveTuple) UDPAddrs() (*net.UDPAddr, *net.UDPAddr, error) {
+func (ft *FiveTuple) UDPAddrs() (local *net.UDPAddr, remote *net.UDPAddr, err error) {
 	if ft.Proto != UDP {
-		return nil, nil, fmt.Errorf("FiveTuple.Proto was not UDP!: %s", ft.Proto)
+		err = fmt.Errorf("FiveTuple.Proto was not UDP!: %s", ft.Proto)
+		return
 	}
-	local, err := net.ResolveUDPAddr("udp", ft.Local)
+	local, err = net.ResolveUDPAddr("udp", ft.Local)
 	if err != nil {
-		return nil, nil, fmt.Errorf("Unable to resolve local UDP address %s: %s", ft.Local)
+		err = fmt.Errorf("Unable to resolve local UDP address %s: %s", ft.Local)
+		return
 	}
-	remote, err := net.ResolveUDPAddr("udp", ft.Remote)
+	remote, err = net.ResolveUDPAddr("udp", ft.Remote)
 	if err != nil {
-		return nil, nil, fmt.Errorf("Unable to resolve remote UDP address %s: %s", ft.Remote)
+		err = fmt.Errorf("Unable to resolve remote UDP address %s: %s", ft.Remote)
 	}
-	return local, remote, nil
+	return
 }
 
 // Traversal represents a single NAT traversal using natty, whose result is
