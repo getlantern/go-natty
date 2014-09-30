@@ -19,40 +19,40 @@ const (
 	WADDELL_ADDR = "localhost:19543"
 )
 
-// TestDirect starts up two local Natty instances that communicate with each
-// other directly.  Once connected, one Natty sends a UDP packet to the other
-// to make sure that the connection works.
+// TestDirect starts up two local Traversals that communicate with each other
+// directly.  Once connected, one peer sends a UDP packet to the other to make
+// sure that the connection works.
 func TestDirect(t *testing.T) {
-	doTest(t, func(offerer *Natty, answerer *Natty) {
+	doTest(t, func(offer *Traversal, answer *Traversal) {
 		go func() {
 			for {
-				msg, done := offerer.NextMsgOut()
+				msg, done := offer.NextMsgOut()
 				if done {
 					return
 				}
-				log.Printf("Offerer -> Answerer: %s", msg)
-				answerer.MsgIn(msg)
+				log.Printf("offer -> answer: %s", msg)
+				answer.MsgIn(msg)
 			}
 		}()
 
 		go func() {
 			for {
-				msg, done := answerer.NextMsgOut()
+				msg, done := answer.NextMsgOut()
 				if done {
 					return
 				}
-				log.Printf("Answerer -> Offerer: %s", msg)
-				offerer.MsgIn(msg)
+				log.Printf("answer -> offer: %s", msg)
+				offer.MsgIn(msg)
 			}
 		}()
 	})
 }
 
-// TestWaddell starts up two local Natty instances that communicate with each
-// other using waddell.  Once connected, one Natty sends a UDP packet to the
-// other to make sure that the connection works.
+// TestWaddell starts up two local Traversals that communicate with each other
+// using a local waddell server.  Once connected, one peer sends a UDP packet to
+// the other to make sure that the connection works.
 func TestWaddell(t *testing.T) {
-	doTest(t, func(offerer *Natty, answerer *Natty) {
+	doTest(t, func(offer *Traversal, answer *Traversal) {
 		// Start a waddell server
 		server := &waddell.Server{}
 		log.Printf("Starting waddell at %s", WADDELL_ADDR)
@@ -67,116 +67,116 @@ func TestWaddell(t *testing.T) {
 			}
 		}()
 
-		offererClient := makeWaddellClient(t)
-		answererClient := makeWaddellClient(t)
+		offerClient := makeWaddellClient(t)
+		answerClient := makeWaddellClient(t)
 
-		// Send from Offerer -> Answerer
+		// Send from offer -> answer
 		go func() {
 			for {
-				msg, done := offerer.NextMsgOut()
+				msg, done := offer.NextMsgOut()
 				if done {
 					return
 				}
-				log.Printf("Offerer -> Answerer: %s", msg)
-				offererClient.Send(answererClient.ID(), []byte(msg))
+				log.Printf("offer -> answer: %s", msg)
+				offerClient.Send(answerClient.ID(), []byte(msg))
 			}
 		}()
 
-		// Receive to Offerer
+		// Receive to offer
 		go func() {
 			for {
 				b := make([]byte, 4096+waddell.WADDELL_OVERHEAD)
-				msg, err := offererClient.Receive(b)
+				msg, err := offerClient.Receive(b)
 				if err != nil {
-					t.Fatalf("Offerer unable to receive message from waddell: %s", err)
+					t.Fatalf("offer unable to receive message from waddell: %s", err)
 				}
-				offerer.MsgIn(string(msg.Body))
+				offer.MsgIn(string(msg.Body))
 			}
 		}()
 
-		// Send from Answerer -> Offerer
+		// Send from answer -> offer
 		go func() {
 			for {
-				msg, done := answerer.NextMsgOut()
+				msg, done := answer.NextMsgOut()
 				if done {
 					return
 				}
-				log.Printf("Answerer -> Offerer: %s", msg)
-				answererClient.Send(offererClient.ID(), []byte(msg))
+				log.Printf("answer -> offer: %s", msg)
+				answerClient.Send(offerClient.ID(), []byte(msg))
 			}
 		}()
 
-		// Receive to Ansserer
+		// Receive to answer
 		go func() {
 			for {
 				b := make([]byte, 4096+waddell.WADDELL_OVERHEAD)
-				msg, err := answererClient.Receive(b)
+				msg, err := answerClient.Receive(b)
 				if err != nil {
-					t.Fatalf("Answerer unable to receive message from waddell: %s", err)
+					t.Fatalf("answer unable to receive message from waddell: %s", err)
 				}
-				answerer.MsgIn(string(msg.Body))
+				answer.MsgIn(string(msg.Body))
 			}
 		}()
 
 	})
 }
 
-func doTest(t *testing.T, signal func(*Natty, *Natty)) {
-	var offerer *Natty
-	var answerer *Natty
+func doTest(t *testing.T, signal func(*Traversal, *Traversal)) {
+	var offer *Traversal
+	var answer *Traversal
 
 	var debug io.Writer
 	if testing.Verbose() {
 		debug = os.Stderr
 	}
 
-	offerer = Offer(debug)
-	defer offerer.Close()
+	offer = Offer(debug)
+	defer offer.Close()
 
-	answerer = Answer(debug)
-	defer answerer.Close()
+	answer = Answer(debug)
+	defer answer.Close()
 
-	var answererReady sync.WaitGroup
-	answererReady.Add(1)
+	var answerReady sync.WaitGroup
+	answerReady.Add(1)
 
 	var wg sync.WaitGroup
 	wg.Add(2)
 
-	// Offerer processing
+	// offer processing
 	go func() {
 		defer wg.Done()
 		// Try it with a really short timeout (should error)
-		fiveTuple, err := offerer.FiveTupleTimeout(5 * time.Millisecond)
+		fiveTuple, err := offer.FiveTupleTimeout(5 * time.Millisecond)
 		if err == nil {
 			t.Errorf("Really short timeout should have given error")
 		}
 
 		// Try it again without timeout
-		fiveTuple, err = offerer.FiveTuple()
+		fiveTuple, err = offer.FiveTuple()
 		if err != nil {
-			t.Errorf("Offerer had error: %s", err)
+			t.Errorf("offer had error: %s", err)
 			return
 		}
 
 		// Call it again to make sure we're getting the same 5-tuple
-		fiveTupleAgain, err := offerer.FiveTuple()
+		fiveTupleAgain, err := offer.FiveTuple()
 		if fiveTupleAgain.Local != fiveTuple.Local ||
 			fiveTupleAgain.Remote != fiveTuple.Remote ||
 			fiveTupleAgain.Proto != fiveTuple.Proto {
-			t.Errorf("2nd 5-tuple didn't match original")
+			t.Errorf("2nd FiveTuple didn't match original")
 		}
 
-		log.Printf("Offerer got 5 tuple: %s", fiveTuple)
+		log.Printf("offer got FiveTuple: %s", fiveTuple)
 		if fiveTuple.Proto != UDP {
 			t.Errorf("Protocol was %s instead of udp", fiveTuple.Proto)
 			return
 		}
 		local, remote, err := udpAddresses(fiveTuple)
 		if err != nil {
-			t.Error("Offerer unable to resolve UDP addresses: %s", err)
+			t.Error("offer unable to resolve UDP addresses: %s", err)
 			return
 		}
-		answererReady.Wait()
+		answerReady.Wait()
 		conn, err := net.DialUDP("udp", local, remote)
 		if err != nil {
 			t.Errorf("Unable to dial UDP: %s", err)
@@ -185,41 +185,41 @@ func doTest(t *testing.T, signal func(*Natty, *Natty)) {
 		for i := 0; i < 10; i++ {
 			_, err := conn.Write([]byte(MESSAGE_TEXT))
 			if err != nil {
-				t.Errorf("Offerer unable to write to UDP: %s", err)
+				t.Errorf("offer unable to write to UDP: %s", err)
 				return
 			}
 		}
 	}()
 
-	// Answerer processing
+	// answer processing
 	go func() {
 		defer wg.Done()
-		fiveTuple, err := answerer.FiveTupleTimeout(5 * time.Second)
+		fiveTuple, err := answer.FiveTupleTimeout(5 * time.Second)
 		if err != nil {
-			t.Errorf("Answerer had error: %s", err)
+			t.Errorf("answer had error: %s", err)
 			return
 		}
 		if fiveTuple.Proto != UDP {
 			t.Errorf("Protocol was %s instead of udp", fiveTuple.Proto)
 			return
 		}
-		log.Printf("Answerer got 5 tuple: %s", fiveTuple)
+		log.Printf("answer got FiveTuple: %s", fiveTuple)
 		local, _, err := udpAddresses(fiveTuple)
 		if err != nil {
-			t.Errorf("Error in Answerer: %s", err)
+			t.Errorf("Error in answer: %s", err)
 			return
 		}
 		conn, err := net.ListenUDP("udp", local)
 		if err != nil {
-			t.Errorf("Answerer unable to listen on UDP: %s", err)
+			t.Errorf("answer unable to listen on UDP: %s", err)
 			return
 		}
-		answererReady.Done()
+		answerReady.Done()
 		b := make([]byte, 1024)
 		for {
 			n, addr, err := conn.ReadFrom(b)
 			if err != nil {
-				t.Errorf("Answerer unable to read from UDP: %s", err)
+				t.Errorf("answer unable to read from UDP: %s", err)
 				return
 			}
 			if addr.String() != fiveTuple.Remote {
@@ -235,9 +235,9 @@ func doTest(t *testing.T, signal func(*Natty, *Natty)) {
 	}()
 
 	// "Signaling" - this would typically be done using a signaling server like
-	// waddell when talking to a remote Natty
+	// waddell when talking to a remote peer
 
-	signal(offerer, answerer)
+	signal(offer, answer)
 
 	doneCh := make(chan interface{})
 	go func() {

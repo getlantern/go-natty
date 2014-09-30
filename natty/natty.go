@@ -1,5 +1,5 @@
 // Package natty provides a Go language wrapper to the natty NAT traversal
-// utility.  See https://github.com/getlantern/natty.
+// utility.  See https://github.com/getlantern/t.
 //
 // See natty_test for an example of Natty in use, including debug logging
 // showing the messages that are sent across the signaling channel.
@@ -37,12 +37,13 @@ type FiveTuple struct {
 	Remote string
 }
 
-// Natty is a NAT traversal utility. It does a single NAT-traversal and makes
-// the result available via the methods FiveTuple() and FiveTupleTimeout().
-// Consumer should make sure to call Close() after finishing with this Natty
+// Traversal represents a single NAT traversal using natty, whose result is
+// available via the methods FiveTuple() and FiveTupleTimeout().
+//
+// Consumers should make sure to call Close() after finishing with this Natty
 // in order to make sure the underlying natty process and associated resources
 // are closed.
-type Natty struct {
+type Traversal struct {
 	debugOut           io.Writer       // target for output from natty's stderr
 	cmd                *exec.Cmd       // the natty command
 	stdin              io.WriteCloser  // pipe to natty's stdin
@@ -61,118 +62,118 @@ type Natty struct {
 	outMutex           sync.Mutex      // mutex for synchronizing access to output variables
 }
 
-// Offer runs a Natty as an Offerer, meaning that it will make an offer to
+// Offer starts a Traversal as an Offerer, meaning that it will make an offer to
 // initiate an ICE session. Call FiveTuple() or FiveTupleTimeout() to get the
-// FiveTuple resulting from NAT traversal.
+// FiveTuple resulting from Traversal.
+//
+// debugOut (optional) is an optional io.Writer to which debug output from natty
+// will be written.
+//
+func Offer(debugOut io.Writer) *Traversal {
+	t := &Traversal{
+		debugOut: debugOut,
+	}
+	t.run([]string{"-offer"})
+	return t
+}
+
+// Answer starts a Traversal as an Answerer, meaning that it will accept offers
+// to initiate an ICE session. Call FiveTuple() or FiveTupleTimeout() to get the
+// FiveTuple resulting from Traversal.
 //
 // debugOut (optional) is an optional io.Writer to which debug output from Natty
 // will be written.
 //
-func Offer(debugOut io.Writer) *Natty {
-	natty := &Natty{
+func Answer(debugOut io.Writer) *Traversal {
+	t := &Traversal{
 		debugOut: debugOut,
 	}
-	natty.run([]string{"-offer"})
-	return natty
+	t.run([]string{})
+	return t
 }
 
-// Answer runs a Natty as an Answerer, meaning that it will accept offers to
-// initiate an ICE session. Call FiveTuple() or FiveTupleTimeout() to get the
-// FiveTuple resulting from NAT traversal.
-//
-// debugOut (optional) is an optional io.Writer to which debug output from Natty
-// will be written.
-//
-func Answer(debugOut io.Writer) *Natty {
-	natty := &Natty{
-		debugOut: debugOut,
-	}
-	natty.run([]string{})
-	return natty
-}
-
-// MsgIn is used to pass this Natty a message from the peer Natty. This method
+// MsgIn is used to pass this Traversal a message from the peer t. This method
 // is buffered and will typically not block.
-func (natty *Natty) MsgIn(msg string) {
-	natty.msgInCh <- msg
+func (t *Traversal) MsgIn(msg string) {
+	t.msgInCh <- msg
 }
 
-// NextMsgOut gets the next message to pass to the peer Natty.  If done is true,
-// there are no more messages to be read, and the currently returned message
-// should be ignored.
-func (natty *Natty) NextMsgOut() (msg string, done bool) {
-	m, ok := <-natty.msgOutCh
+// NextMsgOut gets the next message to pass to the peer.  If done is true, there
+// are no more messages to be read, and the currently returned message should be
+// ignored.
+func (t *Traversal) NextMsgOut() (msg string, done bool) {
+	m, ok := <-t.msgOutCh
 	return m, !ok
 }
 
-// FiveTuple gets the FiveTuple from the NAT traversal, blocking until such is
+// FiveTuple gets the FiveTuple from the Traversal, blocking until such is
 // available.
-func (natty *Natty) FiveTuple() (*FiveTuple, error) {
-	return natty.FiveTupleTimeout(reallyHighTimeout)
+func (t *Traversal) FiveTuple() (*FiveTuple, error) {
+	return t.FiveTupleTimeout(reallyHighTimeout)
 }
 
-// FiveTupleTimeout gets the FiveTuple from the NAT traversal, blocking until
-// such is available or the timeout is hit.
-func (natty *Natty) FiveTupleTimeout(timeout time.Duration) (*FiveTuple, error) {
-	natty.outMutex.Lock()
-	defer natty.outMutex.Unlock()
+// FiveTupleTimeout gets the FiveTuple from the Traversal, blocking until such
+// is available or the timeout is hit.
+func (t *Traversal) FiveTupleTimeout(timeout time.Duration) (*FiveTuple, error) {
+	t.outMutex.Lock()
+	defer t.outMutex.Unlock()
 
-	if natty.fiveTupleOut == nil && natty.errOut == nil {
+	if t.fiveTupleOut == nil && t.errOut == nil {
 		// We don't have a result yet, wait for one
 		select {
-		case ft := <-natty.fiveTupleOutCh:
-			natty.fiveTupleOut = ft
-		case err := <-natty.errOutCh:
-			natty.errOut = err
+		case ft := <-t.fiveTupleOutCh:
+			t.fiveTupleOut = ft
+		case err := <-t.errOutCh:
+			t.errOut = err
 		case <-time.After(timeout):
 			// Return an error, but don't store it (lets caller try again)
 			return nil, fmt.Errorf("Timed out waiting for five-tuple")
 		}
 	}
 
-	return natty.fiveTupleOut, natty.errOut
+	return t.fiveTupleOut, t.errOut
 }
 
-// Close closes this Natty, terminating any outstanding Natty process by sending
-// SIGKILL. Close blocks until the natty process has terminated, at which point
-// any ports that it bound should be available for use.
-func (natty *Natty) Close() error {
-	natty.closePipes()
+// Close closes this Traversal, terminating any outstanding natty process by
+// sending SIGKILL. Close blocks until the natty process has terminated, at
+// which point any ports that it bound should be available for use.
+func (t *Traversal) Close() error {
+	t.closePipes()
 
-	if natty.cmd != nil && natty.cmd.Process != nil {
-		natty.cmd.Process.Kill()
-		natty.cmd.Process.Wait()
+	if t.cmd != nil && t.cmd.Process != nil {
+		t.cmd.Process.Kill()
+		t.cmd.Process.Wait()
 	}
 	return nil
 }
 
-// run runs the Natty command to obtain a FiveTuple. The actual running of
-// Natty happens on a goroutine so that run itself doesn't block.
-func (natty *Natty) run(params []string) {
-	natty.msgInCh = make(chan string, 100)
-	natty.msgOutCh = make(chan string, 100)
+// run runs the natty command to obtain a FiveTuple. The actual running of
+// natty happens on a goroutine so that run itself doesn't block.
+func (t *Traversal) run(params []string) {
+	t.msgInCh = make(chan string, 100)
+	t.msgOutCh = make(chan string, 100)
 
-	// Note - these channels are a little oversized to prevent deadlocks
-	natty.peerGotFiveTupleCh = make(chan bool, 10)
-	natty.fiveTupleCh = make(chan *FiveTuple, 10)
-	natty.errCh = make(chan error, 10)
-	natty.fiveTupleOutCh = make(chan *FiveTuple, 10)
-	natty.errOutCh = make(chan error, 10)
+	// Note - these channels are a buffered in order to prevent deadlocks
+	t.peerGotFiveTupleCh = make(chan bool, 10)
+	t.fiveTupleCh = make(chan *FiveTuple, 10)
+	t.errCh = make(chan error, 10)
+	t.fiveTupleOutCh = make(chan *FiveTuple, 10)
+	t.errOutCh = make(chan error, 10)
 
-	err := natty.initCommand(params)
+	err := t.initCommand(params)
 
 	go func() {
 		if err != nil {
-			natty.errOutCh <- err
+			t.errOutCh <- err
 			return
 		}
 
-		ft, err := natty.doRun(params)
+		ft, err := t.doRun(params)
 		// Once doRun is finished, inform client of the FiveTuple
 		if err != nil {
-			natty.errOutCh <- err
+			t.errOutCh <- err
 		} else {
-			natty.fiveTupleOutCh <- ft
+			t.fiveTupleOutCh <- ft
 		}
 	}()
 }
@@ -180,45 +181,45 @@ func (natty *Natty) run(params []string) {
 // doRun does the running, including resource cleanup.  doRun blocks until
 // Close() has finished, meaning that natty is no longer running and whatever
 // port it returned in the FiveTuple can now be used for other things.
-func (natty *Natty) doRun(params []string) (*FiveTuple, error) {
-	defer natty.Close()
+func (t *Traversal) doRun(params []string) (*FiveTuple, error) {
+	defer t.Close()
 
-	go natty.processStdout()
-	go natty.processStderr()
+	go t.processStdout()
+	go t.processStderr()
 
 	// Start the natty command
-	natty.errCh <- natty.cmd.Start()
+	t.errCh <- t.cmd.Start()
 
 	// Process incoming messages
 	go func() {
 		for {
-			msg := <-natty.msgInCh
+			msg := <-t.msgInCh
 
 			if isFiveTuple(msg) {
-				natty.peerGotFiveTupleCh <- true
+				t.peerGotFiveTupleCh <- true
 				continue
 			}
 
 			// Forward message to natty process
-			_, err := natty.stdin.Write([]byte(msg))
+			_, err := t.stdin.Write([]byte(msg))
 			if err == nil {
-				_, err = natty.stdin.Write([]byte("\n"))
+				_, err = t.stdin.Write([]byte("\n"))
 			}
 			if err != nil {
-				natty.errCh <- err
+				t.errCh <- err
 			}
 		}
 	}()
 
 	for {
 		select {
-		case result := <-natty.fiveTupleCh:
+		case result := <-t.fiveTupleCh:
 			// Wait for peer to get FiveTuple before returning.  If we didn't do
 			// this, our natty instance might stop running before the peer
 			// finishes its work to get its own FiveTuple.
-			<-natty.peerGotFiveTupleCh
+			<-t.peerGotFiveTupleCh
 			return result, nil
-		case err := <-natty.errCh:
+		case err := <-t.errCh:
 			if err != nil && err != io.EOF {
 				return nil, err
 			}
@@ -227,10 +228,10 @@ func (natty *Natty) doRun(params []string) (*FiveTuple, error) {
 }
 
 // initCommand sets up the natty command
-func (natty *Natty) initCommand(params []string) error {
-	if natty.debugOut == nil {
+func (t *Traversal) initCommand(params []string) error {
+	if t.debugOut == nil {
 		// Discard stderr output by default
-		natty.debugOut = ioutil.Discard
+		t.debugOut = ioutil.Discard
 	} else {
 		// Tell natty to log debug output
 		params = append(params, "-debug")
@@ -245,68 +246,68 @@ func (natty *Natty) initCommand(params []string) error {
 		return err
 	}
 
-	natty.cmd = be.Command(params...)
-	natty.stdin, err = natty.cmd.StdinPipe()
+	t.cmd = be.Command(params...)
+	t.stdin, err = t.cmd.StdinPipe()
 	if err != nil {
 		return err
 	}
-	natty.stdout, err = natty.cmd.StdoutPipe()
+	t.stdout, err = t.cmd.StdoutPipe()
 	if err != nil {
 		return err
 	}
-	natty.stderr, err = natty.cmd.StderrPipe()
+	t.stderr, err = t.cmd.StderrPipe()
 	if err != nil {
 		return err
 	}
 
-	natty.stdoutbuf = bufio.NewReader(natty.stdout)
+	t.stdoutbuf = bufio.NewReader(t.stdout)
 
 	return nil
 }
 
 // processStdout reads the output from natty and sends it to the msgOutCh. If
 // it finds a FiveTuple, it records that.
-func (natty *Natty) processStdout() {
+func (t *Traversal) processStdout() {
 	for {
 		// Read next message from natty
-		msg, err := natty.stdoutbuf.ReadString('\n')
+		msg, err := t.stdoutbuf.ReadString('\n')
 		if err != nil {
-			natty.errCh <- err
+			t.errCh <- err
 			return
 		}
 
 		// Request send of message to peer
-		natty.msgOutCh <- msg
+		t.msgOutCh <- msg
 
 		if isFiveTuple(msg) {
 			// We got a FiveTuple!
 			fiveTuple := &FiveTuple{}
 			err = json.Unmarshal([]byte(msg), fiveTuple)
 			if err != nil {
-				natty.errCh <- err
+				t.errCh <- err
 				return
 			}
-			natty.fiveTupleCh <- fiveTuple
+			t.fiveTupleCh <- fiveTuple
 		}
 	}
 }
 
 // processStderr copies the output from natty's stderr to the configured
 // DebugOut
-func (natty *Natty) processStderr() {
-	_, err := io.Copy(natty.debugOut, natty.stderr)
-	natty.errCh <- err
+func (t *Traversal) processStderr() {
+	_, err := io.Copy(t.debugOut, t.stderr)
+	t.errCh <- err
 }
 
-func (natty *Natty) closePipes() {
-	if natty.stdin != nil {
-		natty.stdin.Close()
+func (t *Traversal) closePipes() {
+	if t.stdin != nil {
+		t.stdin.Close()
 	}
-	if natty.stdout != nil {
-		natty.stdout.Close()
+	if t.stdout != nil {
+		t.stdout.Close()
 	}
-	if natty.stderr != nil {
-		natty.stderr.Close()
+	if t.stderr != nil {
+		t.stderr.Close()
 	}
 }
 
