@@ -77,6 +77,7 @@ func (p *peer) answer(wm *waddell.Message) {
 				p.traversalsMutex.Lock()
 				defer p.traversalsMutex.Unlock()
 				delete(p.traversals, traversalId)
+				t.Close()
 			}()
 
 			ft, err := t.FiveTupleTimeout(TIMEOUT)

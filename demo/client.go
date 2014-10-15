@@ -34,12 +34,14 @@ func runClient() {
 	}
 
 	t := natty.Offer(debugOut)
+	defer t.Close()
 
 	go sendMessages(t, serverId, traversalId)
 	go receiveMessages(t, traversalId)
 
 	ft, err := t.FiveTupleTimeout(TIMEOUT)
 	if err != nil {
+		t.Close()
 		log.Fatalf("Unable to offer: %s", err)
 	}
 	log.Printf("Got five tuple: %s", ft)
