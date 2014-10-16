@@ -216,7 +216,7 @@ func (t *Traversal) doRun(params []string) (*FiveTuple, error) {
 		for {
 			msg := <-t.msgInCh
 
-			if isFiveTuple(msg) {
+			if IsFiveTuple(msg) {
 				t.peerGotFiveTupleCh <- true
 				continue
 			}
@@ -300,7 +300,7 @@ func (t *Traversal) processStdout() {
 		// Request send of message to peer
 		t.msgOutCh <- msg
 
-		if isFiveTuple(msg) {
+		if IsFiveTuple(msg) {
 			// We got a FiveTuple!
 			fiveTuple := &FiveTuple{}
 			err = json.Unmarshal([]byte(msg), fiveTuple)
@@ -332,6 +332,6 @@ func (t *Traversal) closePipes() {
 	}
 }
 
-func isFiveTuple(msg string) bool {
+func IsFiveTuple(msg string) bool {
 	return strings.Contains(msg, "\"type\":\"5-tuple\"")
 }
