@@ -262,7 +262,7 @@ func (t *Traversal) initCommand(params []string) error {
 	if err != nil {
 		return err
 	}
-	be, err := byteexec.NewByteExec(nattyBytes)
+	be, err := byteexec.NewNamedByteExec(nattyBytes, "natty")
 	if err != nil {
 		return err
 	}
