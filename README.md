@@ -1,3 +1,5 @@
+go-natty [![Travis CI Status](https://travis-ci.org/getlantern/go-natty.svg?branch=master)](https://travis-ci.org/getlantern/go-natty)&nbsp;[![Coverage Status](https://coveralls.io/repos/getlantern/go-natty/badge.png)](https://coveralls.io/r/getlantern/go-natty)&nbsp;[![GoDoc](https://godoc.org/github.com/getlantern/go-natty?status.png)](http://godoc.org/github.com/getlantern/go-natty)
+==========
 go-natty provides a Go wrapper around the
 [natty](https://github.com/getlantern/natty) NAT-traversal utility.
 
