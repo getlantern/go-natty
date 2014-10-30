@@ -13,7 +13,7 @@ For docs:
 
 ## Demo
 
-There's a [demo application](tree/master/demo) available. Right now it only
+There's a [demo application](https://github.com/getlantern/go-natty/tree/master/demo) available. Right now it only
 works on OS X. Binaries are available
 [here](https://github.com/getlantern/go-natty/releases/download/demo-0.0.1/natty-demo-osx).
 
