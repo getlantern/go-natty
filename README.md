@@ -11,15 +11,15 @@ For docs:
 
 [`godoc github.com/getlantern/go-natty/natty`](https://godoc.org/github.com/getlantern/go-natty/natty)
 
+## Embedding Natty
+
+To build the go files that embed the natty executables for different platforms, just place the binaries into the right subfolder of `binaries` and then run `embednatty.bash`.
+
 ## Demo
 
 There's a [demo application](https://github.com/getlantern/go-natty/tree/master/demo) available. Right now it only
 works on OS X. Binaries are available
 [here](https://github.com/getlantern/go-natty/releases/download/demo-0.0.1/natty-demo-osx).
-
-The demo application allows running a client as well as a server peer. The
-client will connect to the server and obtain its IP address by making a request
-to [ifconfig.me](http://ifconfig.me/ip).
 
 The client and server signal with each other using
 [waddell](getlantern/waddell) and the client sends UDP packets to the server
