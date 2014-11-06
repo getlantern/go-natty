@@ -258,6 +258,7 @@ func (t *Traversal) doRun(params []string) (*FiveTuple, error) {
 			// finishes its work to get its own FiveTuple.
 			log.Trace("Got our own FiveTuple, waiting for peer to get FiveTuple")
 			<-t.peerGotFiveTupleCh
+			log.Trace("Peer got FiveTuple!")
 			return result, nil
 		case err := <-t.errCh:
 			if err != nil && err != io.EOF {
