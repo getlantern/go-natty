@@ -207,7 +207,7 @@ func (t *Traversal) run(params []string) {
 		}
 
 		ft, err := t.doRun(params)
-		// Once doRun is finished, inform client of the FiveTuple
+		log.Trace("doRun is finished, inform client of the FiveTuple")
 		if err != nil {
 			log.Tracef("Returning error: %s", err)
 			t.errOutCh <- err
