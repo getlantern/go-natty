@@ -170,8 +170,11 @@ func (t *Traversal) FiveTupleTimeout(timeout time.Duration) (*FiveTuple, error) 
 // sending SIGKILL. Close blocks until the natty process has terminated, at
 // which point any ports that it bound should be available for use.
 func (t *Traversal) Close() error {
-	log.Trace("Closing pipes")
-	t.closePipes()
+	go func() {
+		// For some reason, we have to do this on a goroutine on Windows
+		log.Trace("Closing pipes")
+		t.closePipes()
+	}()
 
 	if t.cmd != nil && t.cmd.Process != nil {
 		log.Trace("Killing natty process")
@@ -345,12 +348,15 @@ func (t *Traversal) processStderr() {
 
 func (t *Traversal) closePipes() {
 	if t.stdin != nil {
+		log.Trace("Closing stdin")
 		t.stdin.Close()
 	}
 	if t.stdout != nil {
+		log.Trace("Closing stdout")
 		t.stdout.Close()
 	}
 	if t.stderr != nil {
+		log.Trace("Closing stderr")
 		t.stderr.Close()
 	}
 }
