@@ -220,7 +220,7 @@ func doTest(t *testing.T, signal func(*Traversal, *Traversal)) {
 			errorf(t, "answer unable to listen on UDP: %s", err)
 			return
 		}
-		tlog.Debug("Answerer listining on UDP: %s", local)
+		tlog.Debugf("Answerer listining on UDP: %s", local)
 		answerReady.Done()
 		b := make([]byte, 1024)
 		for {
