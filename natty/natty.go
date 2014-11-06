@@ -152,8 +152,10 @@ func (t *Traversal) FiveTupleTimeout(timeout time.Duration) (*FiveTuple, error) 
 		log.Trace("We don't have a result yet, wait for one")
 		select {
 		case ft := <-t.fiveTupleOutCh:
+			log.Tracef("FiveTuple is: %s", ft)
 			t.fiveTupleOut = ft
 		case err := <-t.errOutCh:
+			log.Tracef("Error is: %s", err)
 			t.errOut = err
 		case <-time.After(timeout):
 			log.Trace("Return an error, but don't store it (lets caller try again)")
