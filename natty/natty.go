@@ -33,15 +33,6 @@ var (
 	nattybe *byteexec.ByteExec
 )
 
-type Protocol string
-
-// A FiveTuple is the result of a successful NAT traversal.
-type FiveTuple struct {
-	Proto  Protocol
-	Local  string
-	Remote string
-}
-
 func init() {
 	nattyBytes, err := Asset("natty")
 	if err != nil {
@@ -52,6 +43,15 @@ func init() {
 	if err != nil {
 		panic(fmt.Errorf("Unable to construct byteexec for natty: %s", err))
 	}
+}
+
+type Protocol string
+
+// A FiveTuple is the result of a successful NAT traversal.
+type FiveTuple struct {
+	Proto  Protocol
+	Local  string
+	Remote string
 }
 
 // UDPAddrs returns a pair of UDPAddrs representing the Local and Remote
