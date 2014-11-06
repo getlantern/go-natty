@@ -151,13 +151,13 @@ func doTest(t *testing.T, signal func(*Traversal, *Traversal)) {
 		// Try it with a really short timeout (should error)
 		fiveTuple, err := offer.FiveTupleTimeout(5 * time.Millisecond)
 		if err == nil {
-			t.Errorf("Really short timeout should have given error")
+			errorf(t, "Really short timeout should have given error")
 		}
 
 		// Try it again without timeout
 		fiveTuple, err = offer.FiveTuple()
 		if err != nil {
-			t.Errorf("offer had error: %s", err)
+			errorf(t, "offer had error: %s", err)
 			return
 		}
 
@@ -166,29 +166,29 @@ func doTest(t *testing.T, signal func(*Traversal, *Traversal)) {
 		if fiveTupleAgain.Local != fiveTuple.Local ||
 			fiveTupleAgain.Remote != fiveTuple.Remote ||
 			fiveTupleAgain.Proto != fiveTuple.Proto {
-			t.Errorf("2nd FiveTuple didn't match original")
+			errorf(t, "2nd FiveTuple didn't match original")
 		}
 
 		log.Printf("offer got FiveTuple: %s", fiveTuple)
 		if fiveTuple.Proto != UDP {
-			t.Errorf("Protocol was %s instead of udp", fiveTuple.Proto)
+			errorf(t, "Protocol was %s instead of udp", fiveTuple.Proto)
 			return
 		}
 		local, remote, err := fiveTuple.UDPAddrs()
 		if err != nil {
-			t.Error("offer unable to resolve UDP addresses: %s", err)
+			errorf(t, "offer unable to resolve UDP addresses: %s", err)
 			return
 		}
 		answerReady.Wait()
 		conn, err := net.DialUDP("udp", local, remote)
 		if err != nil {
-			t.Errorf("Unable to dial UDP: %s", err)
+			errorf(t, "Unable to dial UDP: %s", err)
 			return
 		}
 		for i := 0; i < 10; i++ {
 			_, err := conn.Write([]byte(MESSAGE_TEXT))
 			if err != nil {
-				t.Errorf("offer unable to write to UDP: %s", err)
+				errorf(t, "offer unable to write to UDP: %s", err)
 				return
 			}
 		}
@@ -199,22 +199,22 @@ func doTest(t *testing.T, signal func(*Traversal, *Traversal)) {
 		defer wg.Done()
 		fiveTuple, err := answer.FiveTupleTimeout(5 * time.Second)
 		if err != nil {
-			t.Errorf("answer had error: %s", err)
+			errorf(t, "answer had error: %s", err)
 			return
 		}
 		if fiveTuple.Proto != UDP {
-			t.Errorf("Protocol was %s instead of udp", fiveTuple.Proto)
+			errorf(t, "Protocol was %s instead of udp", fiveTuple.Proto)
 			return
 		}
 		log.Printf("answer got FiveTuple: %s", fiveTuple)
 		local, _, err := fiveTuple.UDPAddrs()
 		if err != nil {
-			t.Errorf("Error in answer: %s", err)
+			errorf(t, "Error in answer: %s", err)
 			return
 		}
 		conn, err := net.ListenUDP("udp", local)
 		if err != nil {
-			t.Errorf("answer unable to listen on UDP: %s", err)
+			errorf(t, "answer unable to listen on UDP: %s", err)
 			return
 		}
 		answerReady.Done()
@@ -222,11 +222,11 @@ func doTest(t *testing.T, signal func(*Traversal, *Traversal)) {
 		for {
 			n, addr, err := conn.ReadFrom(b)
 			if err != nil {
-				t.Errorf("answer unable to read from UDP: %s", err)
+				errorf(t, "answer unable to read from UDP: %s", err)
 				return
 			}
 			if addr.String() != fiveTuple.Remote {
-				t.Errorf("UDP package had address %s, expected %s", addr, fiveTuple.Remote)
+				errorf(t, "UDP package had address %s, expected %s", addr, fiveTuple.Remote)
 				return
 			}
 			msg := string(b[:n])
@@ -252,7 +252,7 @@ func doTest(t *testing.T, signal func(*Traversal, *Traversal)) {
 	case <-doneCh:
 		return
 	case <-time.After(1000 * time.Second):
-		t.Errorf("Test timed out")
+		errorf(t, "Test timed out")
 	}
 }
 
@@ -266,4 +266,9 @@ func makeWaddellClient(t *testing.T) *waddell.Client {
 		t.Fatalf("Unable to connect to waddell: %s", err)
 	}
 	return wc
+}
+
+func errorf(t *testing.T, msg string, args ...interface{}) {
+	log.Printf("error: "+msg, args...)
+	t.Errorf(msg, args...)
 }
