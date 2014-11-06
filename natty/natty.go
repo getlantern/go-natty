@@ -163,6 +163,7 @@ func (t *Traversal) FiveTupleTimeout(timeout time.Duration) (*FiveTuple, error) 
 		}
 	}
 
+	log.Tracef("FiveTupleTimeout returns %s: %s", t.fiveTupleOut, t.errOut)
 	return t.fiveTupleOut, t.errOut
 }
 
