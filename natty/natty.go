@@ -30,7 +30,7 @@ var (
 
 	reallyHighTimeout = 100000 * time.Hour
 
-	nattybe *byteexec.ByteExec
+	nattybe *byteexec.Exec
 )
 
 func init() {
