@@ -10,7 +10,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net"
 	"os/exec"
 	"strings"
@@ -68,7 +67,7 @@ func (ft *FiveTuple) UDPAddrs() (local *net.UDPAddr, remote *net.UDPAddr, err er
 // in order to make sure the underlying natty process and associated resources
 // are closed.
 type Traversal struct {
-	debugOut           io.Writer       // target for output from natty's stderr
+	traceOut           io.Writer       // target for output from natty's stderr
 	cmd                *exec.Cmd       // the natty command
 	stdin              io.WriteCloser  // pipe to natty's stdin
 	stdout             io.ReadCloser   // pipe from natty's stdout
@@ -89,14 +88,10 @@ type Traversal struct {
 // Offer starts a Traversal as an Offerer, meaning that it will make an offer to
 // initiate an ICE session. Call FiveTuple() or FiveTupleTimeout() to get the
 // FiveTuple resulting from Traversal.
-//
-// debugOut (optional) is an optional io.Writer to which debug output from natty
-// will be written.
-//
-func Offer(debugOut io.Writer) *Traversal {
+func Offer() *Traversal {
 	log.Trace("Offering")
 	t := &Traversal{
-		debugOut: debugOut,
+		traceOut: log.TraceOut(),
 	}
 	t.run([]string{"-offer"})
 	return t
@@ -105,14 +100,10 @@ func Offer(debugOut io.Writer) *Traversal {
 // Answer starts a Traversal as an Answerer, meaning that it will accept offers
 // to initiate an ICE session. Call FiveTuple() or FiveTupleTimeout() to get the
 // FiveTuple resulting from Traversal.
-//
-// debugOut (optional) is an optional io.Writer to which debug output from Natty
-// will be written.
-//
-func Answer(debugOut io.Writer) *Traversal {
+func Answer() *Traversal {
 	log.Trace("Answering")
 	t := &Traversal{
-		debugOut: debugOut,
+		traceOut: log.TraceOut(),
 	}
 	t.run([]string{})
 	return t
@@ -171,12 +162,6 @@ func (t *Traversal) FiveTupleTimeout(timeout time.Duration) (*FiveTuple, error) 
 // sending SIGKILL. Close blocks until the natty process has terminated, at
 // which point any ports that it bound should be available for use.
 func (t *Traversal) Close() error {
-	go func() {
-		// For some reason, we have to do this on a goroutine on Windows
-		log.Trace("Closing pipes")
-		t.closePipes()
-	}()
-
 	if t.cmd != nil && t.cmd.Process != nil {
 		log.Trace("Killing natty process")
 		t.cmd.Process.Kill()
@@ -277,13 +262,8 @@ func (t *Traversal) doRun(params []string) (*FiveTuple, error) {
 
 // initCommand sets up the natty command
 func (t *Traversal) initCommand(params []string) error {
-	if t.debugOut == nil {
-		// Discard stderr output by default
-		t.debugOut = ioutil.Discard
-	} else {
-		// Tell natty to log debug output
-		params = append(params, "-debug")
-	}
+	// Tell natty to log debug output
+	params = append(params, "-debug")
 
 	nattyBytes, err := Asset("natty")
 	if err != nil {
@@ -341,25 +321,10 @@ func (t *Traversal) processStdout() {
 }
 
 // processStderr copies the output from natty's stderr to the configured
-// DebugOut
+// traceOut
 func (t *Traversal) processStderr() {
-	_, err := io.Copy(t.debugOut, t.stderr)
+	_, err := io.Copy(t.traceOut, t.stderr)
 	t.errCh <- err
-}
-
-func (t *Traversal) closePipes() {
-	if t.stdin != nil {
-		log.Trace("Closing stdin")
-		t.stdin.Close()
-	}
-	if t.stdout != nil {
-		log.Trace("Closing stdout")
-		t.stdout.Close()
-	}
-	if t.stderr != nil {
-		log.Trace("Closing stderr")
-		t.stderr.Close()
-	}
 }
 
 func IsFiveTuple(msg string) bool {

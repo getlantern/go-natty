@@ -1,9 +1,7 @@
 package natty
 
 import (
-	"io"
 	"net"
-	"os"
 	"sync"
 	"testing"
 	"time"
@@ -130,15 +128,10 @@ func doTest(t *testing.T, signal func(*Traversal, *Traversal)) {
 	var offer *Traversal
 	var answer *Traversal
 
-	var debug io.Writer
-	if testing.Verbose() {
-		debug = os.Stderr
-	}
-
-	offer = Offer(debug)
+	offer = Offer()
 	defer offer.Close()
 
-	answer = Answer(debug)
+	answer = Answer()
 	defer answer.Close()
 
 	var answerReady sync.WaitGroup
