@@ -262,8 +262,10 @@ func (t *Traversal) doRun(params []string) (*FiveTuple, error) {
 
 // initCommand sets up the natty command
 func (t *Traversal) initCommand(params []string) error {
-	// Tell natty to log debug output
-	params = append(params, "-debug")
+	if log.IsTraceEnabled() {
+		log.Trace("Telling natty to log debug output")
+		params = append(params, "-debug")
+	}
 
 	nattyBytes, err := Asset("natty")
 	if err != nil {

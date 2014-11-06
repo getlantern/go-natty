@@ -33,7 +33,7 @@ func runClient() {
 		log.Fatalf("Unable to parse PeerID for server %s: %s", *server, err)
 	}
 
-	t := natty.Offer(debugOut)
+	t := natty.Offer()
 	defer t.Close()
 
 	go sendMessages(t, serverId, traversalId)

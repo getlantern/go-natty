@@ -58,7 +58,7 @@ func (p *peer) answer(wm *waddell.Message) {
 	if t == nil {
 		log.Printf("Answering traversal: %d", traversalId)
 		// Set up a new Natty traversal
-		t = natty.Answer(debugOut)
+		t = natty.Answer()
 		go func() {
 			// Send
 			for {

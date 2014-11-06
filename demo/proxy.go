@@ -3,10 +3,8 @@ package main
 import (
 	"encoding/binary"
 	"flag"
-	"io"
 	"log"
 	"net"
-	"os"
 	"time"
 
 	"github.com/getlantern/waddell"
@@ -27,10 +25,8 @@ var (
 	help        = flag.Bool("help", false, "Get usage help")
 	mode        = flag.String("mode", "client", "client or server. Client initiates the NAT traversal. Defaults to client.")
 	waddellAddr = flag.String("waddell", "128.199.130.61:443", "Address of waddell signaling server, defaults to 128.199.130.61:443")
-	debug       = flag.Bool("debug", false, "Enable debug logging to stderr")
 
-	wc       *waddell.Client
-	debugOut io.Writer
+	wc *waddell.Client
 )
 
 // message represents a message exchanged during a NAT traversal
@@ -59,10 +55,6 @@ func main() {
 	if *help {
 		flag.Usage()
 		return
-	}
-
-	if *debug {
-		debugOut = os.Stderr
 	}
 
 	connectToWaddell()
