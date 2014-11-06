@@ -170,6 +170,7 @@ func (t *Traversal) FiveTupleTimeout(timeout time.Duration) (*FiveTuple, error) 
 // sending SIGKILL. Close blocks until the natty process has terminated, at
 // which point any ports that it bound should be available for use.
 func (t *Traversal) Close() error {
+	log.Trace("Closing pipes")
 	t.closePipes()
 
 	if t.cmd != nil && t.cmd.Process != nil {
