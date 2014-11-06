@@ -188,7 +188,7 @@ func doTest(t *testing.T, signal func(*Traversal, *Traversal)) {
 			errorf(t, "Unable to dial UDP: %s", err)
 			return
 		}
-		tlog.Debug("Offer connected to %s, sending data", local)
+		tlog.Debugf("Offer connected to %s, sending data", local)
 		for i := 0; i < 10; i++ {
 			_, err := conn.Write([]byte(MESSAGE_TEXT))
 			if err != nil {
