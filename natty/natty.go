@@ -29,7 +29,21 @@ var (
 	log = golog.LoggerFor("natty")
 
 	reallyHighTimeout = 100000 * time.Hour
+
+	nattybe *byteexec.Exec
 )
+
+func init() {
+	nattyBytes, err := Asset("natty")
+	if err != nil {
+		panic(fmt.Errorf("Unable to read natty bytes: %s", err))
+	}
+
+	nattybe, err = byteexec.New(nattyBytes, "natty")
+	if err != nil {
+		panic(fmt.Errorf("Unable to construct byteexec for natty: %s", err))
+	}
+}
 
 type Protocol string
 
@@ -261,22 +275,13 @@ func (t *Traversal) doRun(params []string) (*FiveTuple, error) {
 }
 
 // initCommand sets up the natty command
-func (t *Traversal) initCommand(params []string) error {
+func (t *Traversal) initCommand(params []string) (err error) {
 	if log.IsTraceEnabled() {
 		log.Trace("Telling natty to log debug output")
 		params = append(params, "-debug")
 	}
 
-	nattyBytes, err := Asset("natty")
-	if err != nil {
-		return err
-	}
-	be, err := byteexec.NewNamedByteExec(nattyBytes, "natty")
-	if err != nil {
-		return err
-	}
-
-	t.cmd = be.Command(params...)
+	t.cmd = nattybe.Command(params...)
 	t.stdin, err = t.cmd.StdinPipe()
 	if err != nil {
 		return err
