@@ -2,13 +2,13 @@ package natty
 
 import (
 	"io"
-	"log"
 	"net"
 	"os"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/getlantern/golog"
 	"github.com/getlantern/waddell"
 )
 
@@ -17,6 +17,8 @@ const (
 
 	WADDELL_ADDR = "localhost:19543"
 )
+
+var tlog = golog.LoggerFor("natty-test")
 
 // TestDirect starts up two local Traversals that communicate with each other
 // directly.  Once connected, one peer sends a UDP packet to the other to make
@@ -31,7 +33,7 @@ func TestDirect(t *testing.T) {
 				if done {
 					return
 				}
-				log.Printf("offer -> answer: %s", msg)
+				tlog.Debugf("offer -> answer: %s", msg)
 				answer.MsgIn(msg)
 			}
 		}()
@@ -42,7 +44,7 @@ func TestDirect(t *testing.T) {
 				if done {
 					return
 				}
-				log.Printf("answer -> offer: %s", msg)
+				tlog.Debugf("answer -> offer: %s", msg)
 				offer.MsgIn(msg)
 			}
 		}()
@@ -58,7 +60,7 @@ func TestWaddell(t *testing.T) {
 	doTest(t, func(offer *Traversal, answer *Traversal) {
 		// Start a waddell server
 		server := &waddell.Server{}
-		log.Printf("Starting waddell at %s", WADDELL_ADDR)
+		tlog.Debugf("Starting waddell at %s", WADDELL_ADDR)
 		listener, err := net.Listen("tcp", WADDELL_ADDR)
 		if err != nil {
 			t.Fatalf("Unable to listen at %s: %s", WADDELL_ADDR, err)
@@ -80,7 +82,7 @@ func TestWaddell(t *testing.T) {
 				if done {
 					return
 				}
-				log.Printf("offer -> answer: %s", msg)
+				tlog.Debugf("offer -> answer: %s", msg)
 				offerClient.Send(answerClient.ID(), []byte(msg))
 			}
 		}()
@@ -104,7 +106,7 @@ func TestWaddell(t *testing.T) {
 				if done {
 					return
 				}
-				log.Printf("answer -> offer: %s", msg)
+				tlog.Debugf("answer -> offer: %s", msg)
 				answerClient.Send(offerClient.ID(), []byte(msg))
 			}
 		}()
@@ -169,7 +171,7 @@ func doTest(t *testing.T, signal func(*Traversal, *Traversal)) {
 			errorf(t, "2nd FiveTuple didn't match original")
 		}
 
-		log.Printf("offer got FiveTuple: %s", fiveTuple)
+		tlog.Debugf("offer got FiveTuple: %s", fiveTuple)
 		if fiveTuple.Proto != UDP {
 			errorf(t, "Protocol was %s instead of udp", fiveTuple.Proto)
 			return
@@ -206,7 +208,7 @@ func doTest(t *testing.T, signal func(*Traversal, *Traversal)) {
 			errorf(t, "Protocol was %s instead of udp", fiveTuple.Proto)
 			return
 		}
-		log.Printf("answer got FiveTuple: %s", fiveTuple)
+		tlog.Debugf("answer got FiveTuple: %s", fiveTuple)
 		local, _, err := fiveTuple.UDPAddrs()
 		if err != nil {
 			errorf(t, "Error in answer: %s", err)
@@ -231,7 +233,7 @@ func doTest(t *testing.T, signal func(*Traversal, *Traversal)) {
 			}
 			msg := string(b[:n])
 			if msg != MESSAGE_TEXT {
-				log.Printf("Got message '%s', expected '%s'", msg, MESSAGE_TEXT)
+				tlog.Debugf("Got message '%s', expected '%s'", msg, MESSAGE_TEXT)
 			}
 			return
 		}
@@ -269,6 +271,6 @@ func makeWaddellClient(t *testing.T) *waddell.Client {
 }
 
 func errorf(t *testing.T, msg string, args ...interface{}) {
-	log.Printf("error: "+msg, args...)
+	tlog.Errorf("error: "+msg, args...)
 	t.Errorf(msg, args...)
 }

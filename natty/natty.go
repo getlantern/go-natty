@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/getlantern/byteexec"
+	"github.com/getlantern/golog"
 )
 
 const (
@@ -26,6 +27,8 @@ const (
 )
 
 var (
+	log = golog.LoggerFor("natty")
+
 	reallyHighTimeout = 100000 * time.Hour
 )
 
@@ -91,6 +94,7 @@ type Traversal struct {
 // will be written.
 //
 func Offer(debugOut io.Writer) *Traversal {
+	log.Trace("Offering")
 	t := &Traversal{
 		debugOut: debugOut,
 	}
@@ -106,6 +110,7 @@ func Offer(debugOut io.Writer) *Traversal {
 // will be written.
 //
 func Answer(debugOut io.Writer) *Traversal {
+	log.Trace("Answering")
 	t := &Traversal{
 		debugOut: debugOut,
 	}
@@ -116,6 +121,7 @@ func Answer(debugOut io.Writer) *Traversal {
 // MsgIn is used to pass this Traversal a message from the peer t. This method
 // is buffered and will typically not block.
 func (t *Traversal) MsgIn(msg string) {
+	log.Tracef("Got message: %s", msg)
 	t.msgInCh <- msg
 }
 
@@ -124,30 +130,33 @@ func (t *Traversal) MsgIn(msg string) {
 // ignored.
 func (t *Traversal) NextMsgOut() (msg string, done bool) {
 	m, ok := <-t.msgOutCh
+	log.Tracef("Returning out message: %s", m)
 	return m, !ok
 }
 
 // FiveTuple gets the FiveTuple from the Traversal, blocking until such is
 // available.
 func (t *Traversal) FiveTuple() (*FiveTuple, error) {
+	log.Trace("Getting FiveTuple")
 	return t.FiveTupleTimeout(reallyHighTimeout)
 }
 
 // FiveTupleTimeout gets the FiveTuple from the Traversal, blocking until such
 // is available or the timeout is hit.
 func (t *Traversal) FiveTupleTimeout(timeout time.Duration) (*FiveTuple, error) {
+	log.Trace("Getting FiveTupleTimeout")
 	t.outMutex.Lock()
 	defer t.outMutex.Unlock()
 
 	if t.fiveTupleOut == nil && t.errOut == nil {
-		// We don't have a result yet, wait for one
+		log.Trace("We don't have a result yet, wait for one")
 		select {
 		case ft := <-t.fiveTupleOutCh:
 			t.fiveTupleOut = ft
 		case err := <-t.errOutCh:
 			t.errOut = err
 		case <-time.After(timeout):
-			// Return an error, but don't store it (lets caller try again)
+			log.Trace("Return an error, but don't store it (lets caller try again)")
 			return nil, fmt.Errorf("Timed out waiting for five-tuple")
 		}
 	}
@@ -162,8 +171,10 @@ func (t *Traversal) Close() error {
 	t.closePipes()
 
 	if t.cmd != nil && t.cmd.Process != nil {
+		log.Trace("Killing natty process")
 		t.cmd.Process.Kill()
 		t.cmd.Process.Wait()
+		log.Trace("Done killing natty process")
 	}
 	return nil
 }
@@ -192,8 +203,10 @@ func (t *Traversal) run(params []string) {
 		ft, err := t.doRun(params)
 		// Once doRun is finished, inform client of the FiveTuple
 		if err != nil {
+			log.Tracef("Returning error: %s", err)
 			t.errOutCh <- err
 		} else {
+			log.Tracef("Returning FiveTuple: %s", ft)
 			t.fiveTupleOutCh <- ft
 		}
 	}()
@@ -215,19 +228,24 @@ func (t *Traversal) doRun(params []string) (*FiveTuple, error) {
 	go func() {
 		for {
 			msg := <-t.msgInCh
+			log.Tracef("Got incoming message: %s", msg)
 
 			if IsFiveTuple(msg) {
+				log.Trace("Incoming message was a FiveTuple!")
 				t.peerGotFiveTupleCh <- true
 				continue
 			}
 
-			// Forward message to natty process
+			log.Trace("Forward message to natty process")
 			_, err := t.stdin.Write([]byte(msg))
 			if err == nil {
 				_, err = t.stdin.Write([]byte("\n"))
 			}
 			if err != nil {
+				log.Tracef("Unable to forward message to natty process: %s: %s", msg, err)
 				t.errCh <- err
+			} else {
+				log.Tracef("Forwarded message to natty process: %s", msg)
 			}
 		}
 	}()
@@ -238,6 +256,7 @@ func (t *Traversal) doRun(params []string) (*FiveTuple, error) {
 			// Wait for peer to get FiveTuple before returning.  If we didn't do
 			// this, our natty instance might stop running before the peer
 			// finishes its work to get its own FiveTuple.
+			log.Trace("Got our own FiveTuple, waiting for peer to get FiveTuple")
 			<-t.peerGotFiveTupleCh
 			return result, nil
 		case err := <-t.errCh:
