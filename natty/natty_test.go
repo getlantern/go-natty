@@ -22,7 +22,7 @@ var tlog = golog.LoggerFor("natty-test")
 // directly.  Once connected, one peer sends a UDP packet to the other to make
 // sure that the connection works.
 //
-// Run test with -v flag to get debug output from natty.
+// Run test with environment variable TRACE=true to get debug output from natty.
 func TestDirect(t *testing.T) {
 	doTest(t, func(offer *Traversal, answer *Traversal) {
 		go func() {
