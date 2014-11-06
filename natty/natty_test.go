@@ -182,6 +182,7 @@ func doTest(t *testing.T, signal func(*Traversal, *Traversal)) {
 			return
 		}
 		answerReady.Wait()
+		log.Debug("Offer got answerReady")
 		conn, err := net.DialUDP("udp", local, remote)
 		if err != nil {
 			errorf(t, "Unable to dial UDP: %s", err)
@@ -219,6 +220,7 @@ func doTest(t *testing.T, signal func(*Traversal, *Traversal)) {
 			errorf(t, "answer unable to listen on UDP: %s", err)
 			return
 		}
+		tlog.Debug("Answerer listining on UDP: %s", local)
 		answerReady.Done()
 		b := make([]byte, 1024)
 		for {
