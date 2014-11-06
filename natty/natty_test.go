@@ -196,6 +196,7 @@ func doTest(t *testing.T, signal func(*Traversal, *Traversal)) {
 				return
 			}
 		}
+		tlog.Debug("Offer done sending data")
 	}()
 
 	// answer processing
