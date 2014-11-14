@@ -13,7 +13,15 @@ For docs:
 
 ## Embedding Natty
 
-To build the go files that embed the natty executables for different platforms, just place the binaries into the right subfolder of `binaries` and then run `embednatty.bash`.
+To build the go files that embed the natty executables for different platforms,
+just place the binaries into the right subfolder of `binaries` and then run
+`embednatty.bash`. This script takes care of code signing the Windows and OS X
+executables.
+
+Note - you will need to set the environment variables BNS_CERT and BNS_CERT_PASS
+to point to [bns-cert.p12](https://github.com/getlantern/too-many-secrets/blob/master/bns_cert.p12)
+and its [password](https://github.com/getlantern/too-many-secrets/blob/master/build-installers/env-vars.txt#L3)
+so that the script can sign the Windows executable.
 
 ## Demo
 
