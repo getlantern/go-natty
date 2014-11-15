@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/getlantern/byteexec"
+	"github.com/getlantern/go-natty/natty/bin"
 	"github.com/getlantern/golog"
 )
 
@@ -34,7 +35,7 @@ var (
 )
 
 func init() {
-	nattyBytes, err := Asset("natty")
+	nattyBytes, err := bin.Asset("natty")
 	if err != nil {
 		panic(fmt.Errorf("Unable to read natty bytes: %s", err))
 	}
