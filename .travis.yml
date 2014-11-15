@@ -8,7 +8,7 @@ install:
   - go build -v ./...
   - go get code.google.com/p/go.tools/cmd/cover
   - go get -v github.com/axw/gocov/gocov
-  - go get -v github.com/mattn/goveralls
+  - go get -v github.com/getlantern/goveralls
 
 script:
   - $HOME/gopath/bin/goveralls -v -service travis-ci github.com/getlantern/go-natty/natty
