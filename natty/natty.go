@@ -1,5 +1,5 @@
 // Package natty provides a Go language wrapper to the natty NAT traversal
-// utility.  See https://github.com/getlantern/t.
+// utility.  See https://github.com/getlantern/natty.
 //
 // See natty_test for an example of Natty in use, including debug logging
 // showing the messages that are sent across the signaling channel.
