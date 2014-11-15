@@ -179,8 +179,9 @@ func (t *Traversal) Close() error {
 	if t.cmd != nil && t.cmd.Process != nil {
 		log.Trace("Killing natty process")
 		t.cmd.Process.Kill()
-		t.cmd.Process.Wait()
-		log.Trace("Done killing natty process")
+		log.Trace("Waiting for natty process to die")
+		t.cmd.Wait()
+		log.Trace("Killed natty process")
 	}
 	return nil
 }
