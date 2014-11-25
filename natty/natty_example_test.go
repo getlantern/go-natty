@@ -4,10 +4,12 @@ import (
 	elog "log"
 	"net"
 	"time"
+
+	natty "."
 )
 
 func ExampleOffer() {
-	t := Offer()
+	t := natty.Offer()
 	defer t.Close()
 
 	// Process outbound messages
@@ -56,7 +58,7 @@ func ExampleOffer() {
 }
 
 func ExampleAnswer() {
-	t := Answer()
+	t := natty.Answer()
 	defer t.Close()
 
 	// Process outbound messages
