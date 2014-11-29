@@ -14,6 +14,8 @@ const (
 	MessageText = "Hello World"
 
 	WaddellAddr = "localhost:19543"
+
+	TestTopic = waddell.TopicId(9000)
 )
 
 var tlog = golog.LoggerFor("natty-test")
@@ -70,51 +72,47 @@ func TestWaddell(t *testing.T) {
 			}
 		}()
 
-		offerClient := makeWaddellClient(t)
-		answerClient := makeWaddellClient(t)
+		offerClient, offererId := makeWaddellClient(t)
+		answerClient, answererId := makeWaddellClient(t)
 
 		// Send from offer -> answer
 		go func() {
+			out := offerClient.Out(TestTopic)
 			for {
 				msg, done := offer.NextMsgOut()
 				if done {
 					return
 				}
 				tlog.Debugf("offer -> answer: %s", msg)
-				offerClient.Send(answerClient.ID(), []byte(msg))
+				out <- waddell.Message(answererId, []byte(msg))
 			}
 		}()
 
 		// Receive to offer
 		go func() {
-			for {
-				msg, err := offerClient.Receive()
-				if err != nil {
-					t.Fatalf("offer unable to receive message from waddell: %s", err)
-				}
+			in := offerClient.In(TestTopic)
+			for msg := range in {
 				offer.MsgIn(string(msg.Body))
 			}
 		}()
 
 		// Send from answer -> offer
 		go func() {
+			out := answerClient.Out(TestTopic)
 			for {
 				msg, done := answer.NextMsgOut()
 				if done {
 					return
 				}
 				tlog.Debugf("answer -> offer: %s", msg)
-				answerClient.Send(offerClient.ID(), []byte(msg))
+				out <- waddell.Message(offererId, []byte(msg))
 			}
 		}()
 
 		// Receive to answer
 		go func() {
-			for {
-				msg, err := answerClient.Receive()
-				if err != nil {
-					t.Fatalf("answer unable to receive message from waddell: %s", err)
-				}
+			in := answerClient.In(TestTopic)
+			for msg := range in {
 				answer.MsgIn(string(msg.Body))
 			}
 		}()
@@ -253,16 +251,17 @@ func doTest(t *testing.T, signal func(*Traversal, *Traversal)) {
 	}
 }
 
-func makeWaddellClient(t *testing.T) *waddell.Client {
-	conn, err := net.Dial("tcp", WaddellAddr)
-	if err != nil {
-		t.Fatalf("Unable to dial waddell: %s", err)
+func makeWaddellClient(t *testing.T) (*waddell.Client, waddell.PeerId) {
+	wc := &waddell.Client{
+		Dial: func() (net.Conn, error) {
+			return net.Dial("tcp", WaddellAddr)
+		},
 	}
-	wc, err := waddell.Connect(conn)
+	id, err := wc.Connect()
 	if err != nil {
 		t.Fatalf("Unable to connect to waddell: %s", err)
 	}
-	return wc
+	return wc, id
 }
 
 func errorf(t *testing.T, msg string, args ...interface{}) {
