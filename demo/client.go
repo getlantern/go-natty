@@ -62,9 +62,8 @@ func sendMessages(t *natty.Traversal, serverId waddell.PeerId, traversalId uint3
 }
 
 func receiveMessages(t *natty.Traversal, traversalId uint32) {
-	b := make([]byte, MAX_MESSAGE_SIZE+waddell.WADDELL_OVERHEAD)
 	for {
-		wm, err := wc.Receive(b)
+		wm, err := wc.Receive()
 		if err != nil {
 			log.Fatalf("Unable to read message from waddell: %s", err)
 		}

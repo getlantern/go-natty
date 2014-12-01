@@ -1,5 +1,5 @@
 // Package natty provides a Go language wrapper to the natty NAT traversal
-// utility.  See https://github.com/getlantern/t.
+// utility.  See https://github.com/getlantern/natty.
 //
 // See natty_test for an example of Natty in use, including debug logging
 // showing the messages that are sent across the signaling channel.
@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/getlantern/byteexec"
+	"github.com/getlantern/go-natty/natty/bin"
 	"github.com/getlantern/golog"
 )
 
@@ -34,7 +35,7 @@ var (
 )
 
 func init() {
-	nattyBytes, err := Asset("natty")
+	nattyBytes, err := bin.Asset("natty")
 	if err != nil {
 		panic(fmt.Errorf("Unable to read natty bytes: %s", err))
 	}
@@ -179,8 +180,9 @@ func (t *Traversal) Close() error {
 	if t.cmd != nil && t.cmd.Process != nil {
 		log.Trace("Killing natty process")
 		t.cmd.Process.Kill()
-		t.cmd.Process.Wait()
-		log.Trace("Done killing natty process")
+		log.Trace("Waiting for natty process to die")
+		t.cmd.Wait()
+		log.Trace("Killed natty process")
 	}
 	return nil
 }

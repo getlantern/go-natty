@@ -11,9 +11,9 @@ import (
 )
 
 const (
-	MESSAGE_TEXT = "Hello World"
+	MessageText = "Hello World"
 
-	WADDELL_ADDR = "localhost:19543"
+	WaddellAddr = "localhost:19543"
 )
 
 var tlog = golog.LoggerFor("natty-test")
@@ -58,15 +58,15 @@ func TestWaddell(t *testing.T) {
 	doTest(t, func(offer *Traversal, answer *Traversal) {
 		// Start a waddell server
 		server := &waddell.Server{}
-		tlog.Debugf("Starting waddell at %s", WADDELL_ADDR)
-		listener, err := net.Listen("tcp", WADDELL_ADDR)
+		tlog.Debugf("Starting waddell at %s", WaddellAddr)
+		listener, err := net.Listen("tcp", WaddellAddr)
 		if err != nil {
-			t.Fatalf("Unable to listen at %s: %s", WADDELL_ADDR, err)
+			t.Fatalf("Unable to listen at %s: %s", WaddellAddr, err)
 		}
 		go func() {
 			err = server.Serve(listener)
 			if err != nil {
-				t.Fatalf("Unable to start waddell at %s: %s", WADDELL_ADDR, err)
+				t.Fatalf("Unable to start waddell at %s: %s", WaddellAddr, err)
 			}
 		}()
 
@@ -88,8 +88,7 @@ func TestWaddell(t *testing.T) {
 		// Receive to offer
 		go func() {
 			for {
-				b := make([]byte, 4096+waddell.WADDELL_OVERHEAD)
-				msg, err := offerClient.Receive(b)
+				msg, err := offerClient.Receive()
 				if err != nil {
 					t.Fatalf("offer unable to receive message from waddell: %s", err)
 				}
@@ -112,8 +111,7 @@ func TestWaddell(t *testing.T) {
 		// Receive to answer
 		go func() {
 			for {
-				b := make([]byte, 4096+waddell.WADDELL_OVERHEAD)
-				msg, err := answerClient.Receive(b)
+				msg, err := answerClient.Receive()
 				if err != nil {
 					t.Fatalf("answer unable to receive message from waddell: %s", err)
 				}
@@ -183,7 +181,7 @@ func doTest(t *testing.T, signal func(*Traversal, *Traversal)) {
 		}
 		tlog.Debugf("Offer connected to %s, sending data", local)
 		for i := 0; i < 10; i++ {
-			_, err := conn.Write([]byte(MESSAGE_TEXT))
+			_, err := conn.Write([]byte(MessageText))
 			if err != nil {
 				errorf(t, "offer unable to write to UDP: %s", err)
 				return
@@ -229,8 +227,8 @@ func doTest(t *testing.T, signal func(*Traversal, *Traversal)) {
 				return
 			}
 			msg := string(b[:n])
-			if msg != MESSAGE_TEXT {
-				tlog.Debugf("Got message '%s', expected '%s'", msg, MESSAGE_TEXT)
+			if msg != MessageText {
+				tlog.Debugf("Got message '%s', expected '%s'", msg, MessageText)
 			}
 			return
 		}
@@ -256,7 +254,7 @@ func doTest(t *testing.T, signal func(*Traversal, *Traversal)) {
 }
 
 func makeWaddellClient(t *testing.T) *waddell.Client {
-	conn, err := net.Dial("tcp", WADDELL_ADDR)
+	conn, err := net.Dial("tcp", WaddellAddr)
 	if err != nil {
 		t.Fatalf("Unable to dial waddell: %s", err)
 	}
