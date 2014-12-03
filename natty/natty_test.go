@@ -72,8 +72,8 @@ func TestWaddell(t *testing.T) {
 			}
 		}()
 
-		offerClient, offererId := makeWaddellClient(t)
-		answerClient, answererId := makeWaddellClient(t)
+		offerClient := makeWaddellClient(t)
+		answerClient := makeWaddellClient(t)
 
 		// Send from offer -> answer
 		go func() {
@@ -84,7 +84,7 @@ func TestWaddell(t *testing.T) {
 					return
 				}
 				tlog.Debugf("offer -> answer: %s", msg)
-				out <- waddell.Message(answererId, []byte(msg))
+				out <- waddell.Message(answerClient.CurrentId(), []byte(msg))
 			}
 		}()
 
@@ -105,7 +105,7 @@ func TestWaddell(t *testing.T) {
 					return
 				}
 				tlog.Debugf("answer -> offer: %s", msg)
-				out <- waddell.Message(offererId, []byte(msg))
+				out <- waddell.Message(offerClient.CurrentId(), []byte(msg))
 			}
 		}()
 
@@ -251,17 +251,16 @@ func doTest(t *testing.T, signal func(*Traversal, *Traversal)) {
 	}
 }
 
-func makeWaddellClient(t *testing.T) (*waddell.Client, waddell.PeerId) {
-	wc := &waddell.Client{
+func makeWaddellClient(t *testing.T) *waddell.Client {
+	wc, err := waddell.NewClient(&waddell.ClientConfig{
 		Dial: func() (net.Conn, error) {
 			return net.Dial("tcp", WaddellAddr)
 		},
-	}
-	id, err := wc.Connect()
+	})
 	if err != nil {
 		t.Fatalf("Unable to connect to waddell: %s", err)
 	}
-	return wc, id
+	return wc
 }
 
 func errorf(t *testing.T, msg string, args ...interface{}) {

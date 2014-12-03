@@ -73,14 +73,13 @@ func main() {
 }
 
 func connectToWaddell() {
-	wc = &waddell.Client{
+	var err error
+	wc, err = waddell.NewClient(&waddell.ClientConfig{
 		Dial: func() (net.Conn, error) {
 			return net.Dial("tcp", *waddellAddr)
 		},
 		ServerCert: *waddellCert,
-	}
-	var err error
-	id, err = wc.Connect()
+	})
 	if err != nil {
 		log.Fatalf("Unable to connect to waddell: %s", err)
 	}
