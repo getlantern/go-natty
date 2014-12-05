@@ -332,6 +332,7 @@ func (t *Traversal) processStdout() {
 			if err == nil {
 				err = fmt.Errorf("Error reported by natty: %s", msgmap["message"])
 			}
+			t.errCh <- err
 			return
 		}
 	}
