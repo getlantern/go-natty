@@ -57,16 +57,12 @@ func sendMessages(t *natty.Traversal, serverId waddell.PeerId, traversalId uint3
 			return
 		}
 		log.Printf("Sending %s", msgOut)
-		wc.SendPieces(serverId, idToBytes(traversalId), []byte(msgOut))
+		out <- waddell.Message(serverId, idToBytes(traversalId), []byte(msgOut))
 	}
 }
 
 func receiveMessages(t *natty.Traversal, traversalId uint32) {
-	for {
-		wm, err := wc.Receive()
-		if err != nil {
-			log.Fatalf("Unable to read message from waddell: %s", err)
-		}
+	for wm := range in {
 		msg := message(wm.Body)
 		if msg.getTraversalId() != traversalId {
 			log.Printf("Got message for unknown traversal %d, skipping", msg.getTraversalId())

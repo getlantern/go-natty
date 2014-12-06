@@ -21,20 +21,16 @@ var (
 )
 
 func runServer() {
-	log.Printf("Starting server, waddell id is \"%s\"", wc.ID().String())
+	log.Printf("Starting server, waddell id is \"%s\"", id.String())
 
 	peers = make(map[waddell.PeerId]*peer)
 
-	for {
-		wm, err := wc.Receive()
-		if err != nil {
-			log.Fatalf("Unable to read message from waddell: %s", err)
-		}
+	for wm := range in {
 		answer(wm)
 	}
 }
 
-func answer(wm *waddell.Message) {
+func answer(wm *waddell.MessageIn) {
 	peersMutex.Lock()
 	defer peersMutex.Unlock()
 	p := peers[wm.From]
@@ -48,7 +44,7 @@ func answer(wm *waddell.Message) {
 	p.answer(wm)
 }
 
-func (p *peer) answer(wm *waddell.Message) {
+func (p *peer) answer(wm *waddell.MessageIn) {
 	p.traversalsMutex.Lock()
 	defer p.traversalsMutex.Unlock()
 	msg := message(wm.Body)
@@ -66,7 +62,7 @@ func (p *peer) answer(wm *waddell.Message) {
 					return
 				}
 				log.Printf("Sending %s", msgOut)
-				wc.SendPieces(p.id, idToBytes(traversalId), []byte(msgOut))
+				out <- waddell.Message(p.id, idToBytes(traversalId), []byte(msgOut))
 			}
 		}()
 
@@ -117,5 +113,5 @@ func readUDP(peerId waddell.PeerId, traversalId uint32, ft *natty.FiveTuple) {
 }
 
 func notifyClientOfServerReady(peerId waddell.PeerId, traversalId uint32) {
-	wc.SendPieces(peerId, idToBytes(traversalId), []byte(READY))
+	out <- waddell.Message(peerId, idToBytes(traversalId), []byte(READY))
 }
