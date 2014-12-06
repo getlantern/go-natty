@@ -198,7 +198,7 @@ func (t *Traversal) run(params []string) {
 	t.msgInCh = make(chan string, 100)
 	t.msgOutCh = make(chan string, 100)
 
-	// Note - these channels are a buffered in order to prevent deadlocks
+	// Note - these channels are buffered in order to prevent deadlocks
 	t.peerGotFiveTupleCh = make(chan bool, 10)
 	t.fiveTupleCh = make(chan *FiveTuple, 10)
 	t.errCh = make(chan error, 10)

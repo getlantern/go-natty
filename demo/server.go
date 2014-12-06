@@ -53,7 +53,7 @@ func (p *peer) answer(wm *waddell.MessageIn) {
 	if t == nil {
 		log.Printf("Answering traversal: %d", traversalId)
 		// Set up a new Natty traversal
-		t = natty.Answer()
+		t = natty.Answer(TIMEOUT)
 		go func() {
 			// Send
 			for {
@@ -75,7 +75,7 @@ func (p *peer) answer(wm *waddell.MessageIn) {
 				t.Close()
 			}()
 
-			ft, err := t.FiveTupleTimeout(TIMEOUT)
+			ft, err := t.FiveTuple()
 			if err != nil {
 				log.Printf("Unable to answer traversal %d: %s", traversalId, err)
 				return
