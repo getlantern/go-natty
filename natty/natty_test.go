@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/getlantern/golog"
+	"github.com/getlantern/testify/assert"
 	"github.com/getlantern/waddell"
 )
 
@@ -19,6 +20,15 @@ const (
 )
 
 var tlog = golog.LoggerFor("natty-test")
+
+func TestTimeout(t *testing.T) {
+	offer := Offer(1 * time.Millisecond)
+	_, err := offer.FiveTuple()
+	assert.Error(t, err, "There should be an error")
+	if err != nil {
+		assert.Contains(t, err.Error(), "Timed out", "Error should mention timing out")
+	}
+}
 
 // TestDirect starts up two local Traversals that communicate with each other
 // directly.  Once connected, one peer sends a UDP packet to the other to make
@@ -124,10 +134,10 @@ func doTest(t *testing.T, signal func(*Traversal, *Traversal)) {
 	var offer *Traversal
 	var answer *Traversal
 
-	offer = Offer()
+	offer = Offer(0)
 	defer offer.Close()
 
-	answer = Answer()
+	answer = Answer(15 * time.Second)
 	defer answer.Close()
 
 	var answerReady sync.WaitGroup
@@ -139,14 +149,9 @@ func doTest(t *testing.T, signal func(*Traversal, *Traversal)) {
 	// offer processing
 	go func() {
 		defer wg.Done()
-		// Try it with a really short timeout (should error)
-		fiveTuple, err := offer.FiveTupleTimeout(5 * time.Millisecond)
-		if err == nil {
-			errorf(t, "Really short timeout should have given error")
-		}
 
-		// Try it again without timeout
-		fiveTuple, err = offer.FiveTuple()
+		// Get the FiveTuple
+		fiveTuple, err := offer.FiveTuple()
 		if err != nil {
 			errorf(t, "offer had error: %s", err)
 			return
@@ -191,7 +196,7 @@ func doTest(t *testing.T, signal func(*Traversal, *Traversal)) {
 	// answer processing
 	go func() {
 		defer wg.Done()
-		fiveTuple, err := answer.FiveTupleTimeout(5 * time.Second)
+		fiveTuple, err := answer.FiveTuple()
 		if err != nil {
 			errorf(t, "answer had error: %s", err)
 			return
