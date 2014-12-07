@@ -65,12 +65,12 @@ func (ft *FiveTuple) UDPAddrs() (local *net.UDPAddr, remote *net.UDPAddr, err er
 	}
 	local, err = net.ResolveUDPAddr("udp", ft.Local)
 	if err != nil {
-		err = fmt.Errorf("Unable to resolve local UDP address %s: %s", ft.Local)
+		err = fmt.Errorf("Unable to resolve local UDP address %s: %s", ft.Local, err)
 		return
 	}
 	remote, err = net.ResolveUDPAddr("udp", ft.Remote)
 	if err != nil {
-		err = fmt.Errorf("Unable to resolve remote UDP address %s: %s", ft.Remote)
+		err = fmt.Errorf("Unable to resolve remote UDP address %s: %s", ft.Remote, err)
 	}
 	return
 }
