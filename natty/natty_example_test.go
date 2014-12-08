@@ -9,7 +9,7 @@ import (
 )
 
 func ExampleOffer() {
-	t := natty.Offer()
+	t := natty.Offer(15 * time.Second)
 	defer t.Close()
 
 	// Process outbound messages
@@ -34,7 +34,7 @@ func ExampleOffer() {
 	}()
 
 	// Try it with a really short timeout (should error)
-	fiveTuple, err := t.FiveTupleTimeout(15 * time.Second)
+	fiveTuple, err := t.FiveTuple()
 	if err != nil {
 		elog.Fatal(err)
 	}
@@ -58,7 +58,7 @@ func ExampleOffer() {
 }
 
 func ExampleAnswer() {
-	t := natty.Answer()
+	t := natty.Answer(15 * time.Second)
 	defer t.Close()
 
 	// Process outbound messages
@@ -82,7 +82,7 @@ func ExampleAnswer() {
 		}
 	}()
 
-	fiveTuple, err := t.FiveTupleTimeout(15 * time.Second)
+	fiveTuple, err := t.FiveTuple()
 	if err != nil {
 		elog.Fatal(err)
 	}
