@@ -199,11 +199,14 @@ func (t *Traversal) run(params []string) {
 	t.msgOutCh = make(chan string, 100)
 
 	// Note - these channels are buffered in order to prevent deadlocks
-	t.peerGotFiveTupleCh = make(chan bool, 10)
-	t.fiveTupleCh = make(chan *FiveTuple, 10)
-	t.errCh = make(chan error, 10)
-	t.fiveTupleOutCh = make(chan *FiveTuple, 10)
-	t.errOutCh = make(chan error, 10)
+	// The bufferDepth just needs to be at least as large as the total number of
+	// goroutines created during a single traversal (which is about 4).
+	bufferDepth := 10
+	t.peerGotFiveTupleCh = make(chan bool, bufferDepth)
+	t.fiveTupleCh = make(chan *FiveTuple, bufferDepth)
+	t.errCh = make(chan error, bufferDepth)
+	t.fiveTupleOutCh = make(chan *FiveTuple, bufferDepth)
+	t.errOutCh = make(chan error, bufferDepth)
 
 	err := t.initCommand(params)
 
