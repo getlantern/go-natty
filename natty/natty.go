@@ -286,11 +286,11 @@ func (t *Traversal) processStdout() {
 			return
 		}
 
-		// Request send of message to peer
+		log.Trace("Request send of message to peer")
 		t.msgOutCh <- msg
 
 		if IsFiveTuple(msg) {
-			// We got a FiveTuple!
+			log.Trace("We got a FiveTuple!")
 			fiveTuple := &FiveTuple{}
 			err = json.Unmarshal([]byte(msg), fiveTuple)
 			if err != nil {
@@ -298,6 +298,15 @@ func (t *Traversal) processStdout() {
 				return
 			}
 			t.fiveTupleCh <- fiveTuple
+		} else if IsError(msg) {
+			log.Trace("We got an error")
+			msgmap := make(map[string]string)
+			err = json.Unmarshal([]byte(msg), msgmap)
+			if err == nil {
+				err = fmt.Errorf("Error reported by natty: %s", msgmap["message"])
+			}
+			t.errCh <- err
+			return
 		}
 	}
 }
@@ -368,4 +377,8 @@ func (t *Traversal) waitForFiveTuple() (*FiveTuple, error) {
 
 func IsFiveTuple(msg string) bool {
 	return strings.Contains(msg, "\"type\":\"5-tuple\"")
+}
+
+func IsError(msg string) bool {
+	return strings.Contains(msg, "\"type\":\"error\"")
 }
