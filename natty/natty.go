@@ -339,6 +339,8 @@ func (t *Traversal) waitForFiveTuple() (*FiveTuple, error) {
 		timeout = reallyHighTimeout
 	}
 
+	timeoutCh := time.After(timeout)
+
 	for {
 		select {
 		case result := <-t.fiveTupleCh:
@@ -353,7 +355,7 @@ func (t *Traversal) waitForFiveTuple() (*FiveTuple, error) {
 			if err != nil && err != io.EOF {
 				return nil, err
 			}
-		case <-time.After(timeout):
+		case <-timeoutCh:
 			msg := "Timed out waiting for five-tuple"
 			log.Trace(msg)
 			return nil, fmt.Errorf(msg)
