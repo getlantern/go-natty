@@ -34,9 +34,9 @@ The password is [here](https://github.com/getlantern/too-many-secrets/blob/maste
 
 ## Demo
 
-There's a [demo application](https://github.com/getlantern/go-natty/tree/master/demo) available. Right now it only
-works on OS X. Binaries are available
-[here](https://github.com/getlantern/go-natty/releases/download/demo-0.0.1/natty-demo-osx).
+There's a [demo application](https://github.com/getlantern/go-natty/tree/master/demo) available.
+You can build it from inside the demo folder by running `go build .` which will
+create a demo executable.
 
 The client and server signal with each other using
 [waddell](getlantern/waddell) and the client sends UDP packets to the server
