@@ -7,16 +7,26 @@ import (
 	"time"
 
 	"github.com/getlantern/golog"
+	"github.com/getlantern/testify/assert"
 	"github.com/getlantern/waddell"
 )
 
 const (
 	MessageText = "Hello World"
 
-	WaddellAddr = "localhost:19543"
+	TestTopic = waddell.TopicId(9000)
 )
 
 var tlog = golog.LoggerFor("natty-test")
+
+func TestTimeout(t *testing.T) {
+	offer := Offer(1 * time.Millisecond)
+	_, err := offer.FiveTuple()
+	assert.Error(t, err, "There should be an error")
+	if err != nil {
+		assert.Contains(t, err.Error(), "Timed out", "Error should mention timing out")
+	}
+}
 
 // TestDirect starts up two local Traversals that communicate with each other
 // directly.  Once connected, one peer sends a UDP packet to the other to make
@@ -58,63 +68,62 @@ func TestWaddell(t *testing.T) {
 	doTest(t, func(offer *Traversal, answer *Traversal) {
 		// Start a waddell server
 		server := &waddell.Server{}
-		tlog.Debugf("Starting waddell at %s", WaddellAddr)
-		listener, err := net.Listen("tcp", WaddellAddr)
+		laddr := "localhost:0"
+		tlog.Debugf("Starting waddell at %s", laddr)
+		listener, err := net.Listen("tcp", laddr)
 		if err != nil {
-			t.Fatalf("Unable to listen at %s: %s", WaddellAddr, err)
+			t.Fatalf("Unable to listen at %s: %s", laddr, err)
 		}
+		waddr := listener.Addr().String()
+
 		go func() {
 			err = server.Serve(listener)
 			if err != nil {
-				t.Fatalf("Unable to start waddell at %s: %s", WaddellAddr, err)
+				t.Fatalf("Unable to start waddell at %s: %s", waddr, err)
 			}
 		}()
 
-		offerClient := makeWaddellClient(t)
-		answerClient := makeWaddellClient(t)
+		offerClient := makeWaddellClient(t, waddr)
+		answerClient := makeWaddellClient(t, waddr)
 
 		// Send from offer -> answer
 		go func() {
+			out := offerClient.Out(TestTopic)
 			for {
 				msg, done := offer.NextMsgOut()
 				if done {
 					return
 				}
 				tlog.Debugf("offer -> answer: %s", msg)
-				offerClient.Send(answerClient.ID(), []byte(msg))
+				out <- waddell.Message(answerClient.CurrentId(), []byte(msg))
 			}
 		}()
 
 		// Receive to offer
 		go func() {
-			for {
-				msg, err := offerClient.Receive()
-				if err != nil {
-					t.Fatalf("offer unable to receive message from waddell: %s", err)
-				}
+			in := offerClient.In(TestTopic)
+			for msg := range in {
 				offer.MsgIn(string(msg.Body))
 			}
 		}()
 
 		// Send from answer -> offer
 		go func() {
+			out := answerClient.Out(TestTopic)
 			for {
 				msg, done := answer.NextMsgOut()
 				if done {
 					return
 				}
 				tlog.Debugf("answer -> offer: %s", msg)
-				answerClient.Send(offerClient.ID(), []byte(msg))
+				out <- waddell.Message(offerClient.CurrentId(), []byte(msg))
 			}
 		}()
 
 		// Receive to answer
 		go func() {
-			for {
-				msg, err := answerClient.Receive()
-				if err != nil {
-					t.Fatalf("answer unable to receive message from waddell: %s", err)
-				}
+			in := answerClient.In(TestTopic)
+			for msg := range in {
 				answer.MsgIn(string(msg.Body))
 			}
 		}()
@@ -126,10 +135,10 @@ func doTest(t *testing.T, signal func(*Traversal, *Traversal)) {
 	var offer *Traversal
 	var answer *Traversal
 
-	offer = Offer()
+	offer = Offer(0)
 	defer offer.Close()
 
-	answer = Answer()
+	answer = Answer(15 * time.Second)
 	defer answer.Close()
 
 	var answerReady sync.WaitGroup
@@ -141,14 +150,9 @@ func doTest(t *testing.T, signal func(*Traversal, *Traversal)) {
 	// offer processing
 	go func() {
 		defer wg.Done()
-		// Try it with a really short timeout (should error)
-		fiveTuple, err := offer.FiveTupleTimeout(5 * time.Millisecond)
-		if err == nil {
-			errorf(t, "Really short timeout should have given error")
-		}
 
-		// Try it again without timeout
-		fiveTuple, err = offer.FiveTuple()
+		// Get the FiveTuple
+		fiveTuple, err := offer.FiveTuple()
 		if err != nil {
 			errorf(t, "offer had error: %s", err)
 			return
@@ -193,7 +197,7 @@ func doTest(t *testing.T, signal func(*Traversal, *Traversal)) {
 	// answer processing
 	go func() {
 		defer wg.Done()
-		fiveTuple, err := answer.FiveTupleTimeout(5 * time.Second)
+		fiveTuple, err := answer.FiveTuple()
 		if err != nil {
 			errorf(t, "answer had error: %s", err)
 			return
@@ -253,12 +257,12 @@ func doTest(t *testing.T, signal func(*Traversal, *Traversal)) {
 	}
 }
 
-func makeWaddellClient(t *testing.T) *waddell.Client {
-	conn, err := net.Dial("tcp", WaddellAddr)
-	if err != nil {
-		t.Fatalf("Unable to dial waddell: %s", err)
-	}
-	wc, err := waddell.Connect(conn)
+func makeWaddellClient(t *testing.T, waddr string) *waddell.Client {
+	wc, err := waddell.NewClient(&waddell.ClientConfig{
+		Dial: func() (net.Conn, error) {
+			return net.Dial("tcp", waddr)
+		},
+	})
 	if err != nil {
 		t.Fatalf("Unable to connect to waddell: %s", err)
 	}
