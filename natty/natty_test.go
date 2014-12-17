@@ -14,8 +14,6 @@ import (
 const (
 	MessageText = "Hello World"
 
-	WaddellAddr = "localhost:19543"
-
 	TestTopic = waddell.TopicId(9000)
 )
 
@@ -70,20 +68,23 @@ func TestWaddell(t *testing.T) {
 	doTest(t, func(offer *Traversal, answer *Traversal) {
 		// Start a waddell server
 		server := &waddell.Server{}
-		tlog.Debugf("Starting waddell at %s", WaddellAddr)
-		listener, err := net.Listen("tcp", WaddellAddr)
+		laddr := "localhost:0"
+		tlog.Debugf("Starting waddell at %s", laddr)
+		listener, err := net.Listen("tcp", laddr)
 		if err != nil {
-			t.Fatalf("Unable to listen at %s: %s", WaddellAddr, err)
+			t.Fatalf("Unable to listen at %s: %s", laddr, err)
 		}
+		waddr := listener.Addr().String()
+
 		go func() {
 			err = server.Serve(listener)
 			if err != nil {
-				t.Fatalf("Unable to start waddell at %s: %s", WaddellAddr, err)
+				t.Fatalf("Unable to start waddell at %s: %s", waddr, err)
 			}
 		}()
 
-		offerClient := makeWaddellClient(t)
-		answerClient := makeWaddellClient(t)
+		offerClient := makeWaddellClient(t, waddr)
+		answerClient := makeWaddellClient(t, waddr)
 
 		// Send from offer -> answer
 		go func() {
@@ -256,10 +257,10 @@ func doTest(t *testing.T, signal func(*Traversal, *Traversal)) {
 	}
 }
 
-func makeWaddellClient(t *testing.T) *waddell.Client {
+func makeWaddellClient(t *testing.T, waddr string) *waddell.Client {
 	wc, err := waddell.NewClient(&waddell.ClientConfig{
 		Dial: func() (net.Conn, error) {
-			return net.Dial("tcp", WaddellAddr)
+			return net.Dial("tcp", waddr)
 		},
 	})
 	if err != nil {
