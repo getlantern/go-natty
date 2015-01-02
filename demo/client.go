@@ -33,13 +33,13 @@ func runClient() {
 		log.Fatalf("Unable to parse PeerID for server %s: %s", *server, err)
 	}
 
-	t := natty.Offer()
+	t := natty.Offer(TIMEOUT)
 	defer t.Close()
 
 	go sendMessages(t, serverId, traversalId)
 	go receiveMessages(t, traversalId)
 
-	ft, err := t.FiveTupleTimeout(TIMEOUT)
+	ft, err := t.FiveTuple()
 	if err != nil {
 		t.Close()
 		log.Fatalf("Unable to offer: %s", err)
@@ -57,16 +57,12 @@ func sendMessages(t *natty.Traversal, serverId waddell.PeerId, traversalId uint3
 			return
 		}
 		log.Printf("Sending %s", msgOut)
-		wc.SendPieces(serverId, idToBytes(traversalId), []byte(msgOut))
+		out <- waddell.Message(serverId, idToBytes(traversalId), []byte(msgOut))
 	}
 }
 
 func receiveMessages(t *natty.Traversal, traversalId uint32) {
-	for {
-		wm, err := wc.Receive()
-		if err != nil {
-			log.Fatalf("Unable to read message from waddell: %s", err)
-		}
+	for wm := range in {
 		msg := message(wm.Body)
 		if msg.getTraversalId() != traversalId {
 			log.Printf("Got message for unknown traversal %d, skipping", msg.getTraversalId())
