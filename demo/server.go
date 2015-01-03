@@ -1,12 +1,12 @@
 package main
 
 import (
+	"encoding/hex"
+	"github.com/getlantern/go-natty/natty"
+	"github.com/getlantern/waddell"
 	"log"
 	"net"
 	"sync"
-        "encoding/hex"
-	"github.com/getlantern/go-natty/natty"
-	"github.com/getlantern/waddell"
 )
 
 type peer struct {
@@ -82,11 +82,11 @@ func (p *peer) answer(wm *waddell.MessageIn) {
 			}
 
 			log.Printf("Got five tuple: %s", ft)
-                        if ft.Proto == "tcp" {
-                           go readTCP(p.id, traversalId, ft)
-                        } else if ft.Proto == "udp" {
-                        go readUDP(p.id, traversalId, ft)
-                        }
+			if ft.Proto == "tcp" {
+				go readTCP(p.id, traversalId, ft)
+			} else if ft.Proto == "udp" {
+				go readUDP(p.id, traversalId, ft)
+			}
 		}()
 		p.traversals[traversalId] = t
 	}
@@ -117,30 +117,30 @@ func readUDP(peerId waddell.PeerId, traversalId uint32, ft *natty.FiveTuple) {
 }
 
 func readTCP(peerId waddell.PeerId, traversalId uint32, ft *natty.FiveTuple) {
-        local, err := net.ResolveTCPAddr("tcp", ft.Local)
-        if err != nil {
-            log.Fatalf("Unknown TCP addr: %s", err)
-        }
-        tcplisten, err := net.ListenTCP("tcp", local)
-        if err != nil {
-                log.Fatalf("Unable to listen on TCP: %s", err)
-        }
-        log.Printf("Listening for TCP packets at: %s", local)
-        notifyClientOfServerReady(peerId, traversalId)
-        b := make([]byte, 1024)
-        conn, err := tcplisten.Accept()
-        if err != nil {
-           log.Fatalf("Unable to accept on TCP: %s", err)
-        }
-        addr := conn.RemoteAddr()
-        for {
-                n, err := conn.Read(b)
-                if err != nil {
-                        log.Fatalf("Unable to read from TCP: %s", err)
-                }
-                msg := hex.Dump(b[:n])
-                log.Printf("Got TCP message from %s: \n%s", addr, msg)
-        }
+	local, err := net.ResolveTCPAddr("tcp", ft.Local)
+	if err != nil {
+		log.Fatalf("Unknown TCP addr: %s", err)
+	}
+	tcplisten, err := net.ListenTCP("tcp", local)
+	if err != nil {
+		log.Fatalf("Unable to listen on TCP: %s", err)
+	}
+	log.Printf("Listening for TCP packets at: %s", local)
+	notifyClientOfServerReady(peerId, traversalId)
+	b := make([]byte, 1024)
+	conn, err := tcplisten.Accept()
+	if err != nil {
+		log.Fatalf("Unable to accept on TCP: %s", err)
+	}
+	addr := conn.RemoteAddr()
+	for {
+		n, err := conn.Read(b)
+		if err != nil {
+			log.Fatalf("Unable to read from TCP: %s", err)
+		}
+		msg := hex.Dump(b[:n])
+		log.Printf("Got TCP message from %s: \n%s", addr, msg)
+	}
 }
 
 func notifyClientOfServerReady(peerId waddell.PeerId, traversalId uint32) {
