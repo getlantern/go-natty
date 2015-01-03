@@ -98,6 +98,7 @@ func readUDP(peerId waddell.PeerId, traversalId uint32, ft *natty.FiveTuple) {
 	if err != nil {
 		log.Fatalf("Unable to resolve UDP addresses: %s", err)
 	}
+	local.IP = net.IPv4(0, 0, 0, 0)
 	conn, err := net.ListenUDP("udp", local)
 	if err != nil {
 		log.Fatalf("Unable to listen on UDP: %s", err)
