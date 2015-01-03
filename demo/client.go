@@ -45,7 +45,11 @@ func runClient() {
 	}
 	log.Debugf("Got five tuple: %s", ft)
 	if <-serverReady {
-		writeUDP(ft)
+		if "tcp" == *proto {
+			writeTCP(ft)
+		} else {
+			writeUDP(ft)
+		}
 	}
 }
 
@@ -93,6 +97,26 @@ func writeUDP(ft *natty.FiveTuple) {
 		_, err := conn.Write([]byte(msg))
 		if err != nil {
 			log.Fatalf("Offerer unable to write to UDP: %s", err)
+		}
+		time.Sleep(1 * time.Second)
+	}
+}
+
+func writeTCP(ft *natty.FiveTuple) {
+	local, remote, err := ft.TCPAddrs()
+	if err != nil {
+		log.Fatalf("Unable to resolve TCP addresses: %s", err)
+	}
+	conn, err := net.DialTCP("tcp", local, remote)
+	if err != nil {
+		log.Fatalf("Unable to dial TCP: %s", err)
+	}
+	for {
+		msg := fmt.Sprintf("Hello from %s to %s", ft.Local, ft.Remote)
+		log.Debugf("Sending TCP message: %s", msg)
+		_, err := conn.Write([]byte(msg))
+		if err != nil {
+			log.Fatalf("Offerer unable to write to TCP: %s", err)
 		}
 		time.Sleep(1 * time.Second)
 	}

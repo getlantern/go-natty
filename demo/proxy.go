@@ -27,6 +27,7 @@ var (
 
 	help        = flag.Bool("help", false, "Get usage help")
 	mode        = flag.String("mode", "client", "client or server. Client initiates the NAT traversal. Defaults to client.")
+	proto       = flag.String("proto", "udp", "tcp or udp. which protocol to test as transport. Defaults to udp.")
 	waddellAddr = flag.String("waddell", "128.199.130.61:443", "Address of waddell signaling server, defaults to 128.199.130.61:443")
 	waddellCert = flag.String("waddellcert", DefaultWaddellCert, "Certificate for waddell server")
 
