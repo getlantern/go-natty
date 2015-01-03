@@ -75,6 +75,26 @@ func (ft *FiveTuple) UDPAddrs() (local *net.UDPAddr, remote *net.UDPAddr, err er
 	return
 }
 
+// TCPAddrs returns a pair of TCPAddrs representing the Local and Remote
+// addresses of this FiveTuple. If the FiveTuple's Proto is not TCP, this method
+// returns an error.
+func (ft *FiveTuple) TCPAddrs() (local *net.TCPAddr, remote *net.TCPAddr, err error) {
+        if ft.Proto != TCP {
+                err = fmt.Errorf("FiveTuple.Proto was not TCP!: %s", ft.Proto)
+                return
+        }
+        local, err = net.ResolveTCPAddr("tcp", ft.Local)
+        if err != nil {
+                err = fmt.Errorf("Unable to resolve local TCP address %s: %s", ft.Local, err)
+                return
+        }
+        remote, err = net.ResolveTCPAddr("tcp", ft.Remote)
+        if err != nil {
+                err = fmt.Errorf("Unable to resolve remote TCP address %s: %s", ft.Remote, err)
+        }
+        return
+}
+
 // Traversal represents a single NAT traversal using natty, whose result is
 // available via the methods FiveTuple() and FiveTupleTimeout().
 //

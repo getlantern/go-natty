@@ -3,10 +3,10 @@ package main
 import (
 	"encoding/binary"
 	"flag"
-	"log"
 	"net"
 	"time"
 
+	"github.com/getlantern/golog"
 	"github.com/getlantern/waddell"
 )
 
@@ -22,6 +22,7 @@ const (
 )
 
 var (
+	log        = golog.LoggerFor("demo")
 	endianness = binary.LittleEndian
 
 	help        = flag.Bool("help", false, "Get usage help")
@@ -86,7 +87,7 @@ func connectToWaddell() {
 	if err != nil {
 		log.Fatalf("Unable to connect to waddell: %s", err)
 	}
-	log.Printf("Connected")
+	log.Debug("Connected")
 	out = wc.Out(DemoTopic)
 	in = wc.In(DemoTopic)
 }

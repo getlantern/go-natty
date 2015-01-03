@@ -3,7 +3,6 @@ package main
 import (
 	"flag"
 	"fmt"
-	"log"
 	"math/rand"
 	"net"
 	"time"
@@ -21,13 +20,13 @@ var (
 
 func runClient() {
 	if *server == "" {
-		log.Printf("Please specify a -server id")
+		log.Debugf("Please specify a -server id")
 		flag.Usage()
 		return
 	}
-	log.Printf("Starting client, connecting to server %s ...", *server)
+	log.Debugf("Starting client, connecting to server %s ...", *server)
 	traversalId := uint32(rand.Int31())
-	log.Printf("Starting traversal: %d", traversalId)
+	log.Debugf("Starting traversal: %d", traversalId)
 	serverId, err := waddell.PeerIdFromString(*server)
 	if err != nil {
 		log.Fatalf("Unable to parse PeerID for server %s: %s", *server, err)
@@ -44,7 +43,7 @@ func runClient() {
 		t.Close()
 		log.Fatalf("Unable to offer: %s", err)
 	}
-	log.Printf("Got five tuple: %s", ft)
+	log.Debugf("Got five tuple: %s", ft)
 	if <-serverReady {
 		writeUDP(ft)
 	}
@@ -56,7 +55,7 @@ func sendMessages(t *natty.Traversal, serverId waddell.PeerId, traversalId uint3
 		if done {
 			return
 		}
-		log.Printf("Sending %s", msgOut)
+		log.Debugf("Sending %s", msgOut)
 		out <- waddell.Message(serverId, idToBytes(traversalId), []byte(msgOut))
 	}
 }
@@ -65,10 +64,10 @@ func receiveMessages(t *natty.Traversal, traversalId uint32) {
 	for wm := range in {
 		msg := message(wm.Body)
 		if msg.getTraversalId() != traversalId {
-			log.Printf("Got message for unknown traversal %d, skipping", msg.getTraversalId())
+			log.Debugf("Got message for unknown traversal %d, skipping", msg.getTraversalId())
 			continue
 		}
-		log.Printf("Received: %s", msg.getData())
+		log.Debugf("Received: %s", msg.getData())
 		msgString := string(msg.getData())
 		if READY == msgString {
 			// Server's ready!
@@ -90,7 +89,7 @@ func writeUDP(ft *natty.FiveTuple) {
 	}
 	for {
 		msg := fmt.Sprintf("Hello from %s to %s", ft.Local, ft.Remote)
-		log.Printf("Sending UDP message: %s", msg)
+		log.Debugf("Sending UDP message: %s", msg)
 		_, err := conn.Write([]byte(msg))
 		if err != nil {
 			log.Fatalf("Offerer unable to write to UDP: %s", err)
