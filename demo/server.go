@@ -4,7 +4,7 @@ import (
 	"log"
 	"net"
 	"sync"
-     "encoding/hex"
+        "encoding/hex"
 	"github.com/getlantern/go-natty/natty"
 	"github.com/getlantern/waddell"
 )

@@ -79,6 +79,9 @@ func connectToWaddell() {
 			return net.Dial("tcp", *waddellAddr)
 		},
 		ServerCert: *waddellCert,
+                OnId: func(i waddell.PeerId) { 
+                      id = i 
+                },
 	})
 	if err != nil {
 		log.Fatalf("Unable to connect to waddell: %s", err)
