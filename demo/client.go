@@ -87,12 +87,13 @@ func writeUDP(ft *natty.FiveTuple) {
 	if err != nil {
 		log.Fatalf("Unable to resolve UDP addresses: %s", err)
 	}
-	conn, err := net.DialUDP("udp", local, remote)
+        local.IP = net.IPv4(0,0,0,0)
+	conn, err := net.DialUDP("udp", nil, remote)
 	if err != nil {
 		log.Fatalf("Unable to dial UDP: %s", err)
 	}
 	for {
-		msg := fmt.Sprintf("Hello from %s to %s", ft.Local, ft.Remote)
+		msg := fmt.Sprintf("Hello from %s to %s", local, remote)
 		log.Debugf("Sending UDP message: %s", msg)
 		_, err := conn.Write([]byte(msg))
 		if err != nil {
