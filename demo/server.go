@@ -121,6 +121,7 @@ func readTCP(peerId waddell.PeerId, traversalId uint32, ft *natty.FiveTuple) {
 	if err != nil {
 		log.Fatalf("Unknown TCP addr: %s", err)
 	}
+	local.IP = net.IPv4(0, 0, 0, 0)
 	tcplisten, err := net.ListenTCP("tcp", local)
 	if err != nil {
 		log.Fatalf("Unable to listen on TCP: %s", err)
