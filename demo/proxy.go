@@ -3,10 +3,10 @@ package main
 import (
 	"encoding/binary"
 	"flag"
-	"log"
 	"net"
 	"time"
 
+	"github.com/getlantern/golog"
 	"github.com/getlantern/waddell"
 )
 
@@ -22,10 +22,12 @@ const (
 )
 
 var (
+	log        = golog.LoggerFor("demo")
 	endianness = binary.LittleEndian
 
 	help        = flag.Bool("help", false, "Get usage help")
 	mode        = flag.String("mode", "client", "client or server. Client initiates the NAT traversal. Defaults to client.")
+	proto       = flag.String("proto", "udp", "tcp or udp. which protocol to test as transport. Defaults to udp.")
 	waddellAddr = flag.String("waddell", "128.199.130.61:443", "Address of waddell signaling server, defaults to 128.199.130.61:443")
 	waddellCert = flag.String("waddellcert", DefaultWaddellCert, "Certificate for waddell server")
 
@@ -79,11 +81,14 @@ func connectToWaddell() {
 			return net.Dial("tcp", *waddellAddr)
 		},
 		ServerCert: *waddellCert,
+		OnId: func(i waddell.PeerId) {
+			id = i
+		},
 	})
 	if err != nil {
 		log.Fatalf("Unable to connect to waddell: %s", err)
 	}
-	log.Printf("Connected")
+	log.Debug("Connected")
 	out = wc.Out(DemoTopic)
 	in = wc.In(DemoTopic)
 }
