@@ -39,7 +39,7 @@ You can build it from inside the demo folder by running `go build .` which will
 create a demo executable.
 
 The client and server signal with each other using
-[waddell](getlantern/waddell) and the client sends UDP packets to the server
+[waddell](https://github.com/getlantern/waddell) and the client sends UDP packets to the server
 once NAT-traversal is complete. The client finds the server on waddell using
 its waddell id.
 
